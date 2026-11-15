@@ -42,9 +42,43 @@ describe('the code scene', () => {
   });
 });
 
+describe('the world scene (a cinematic 3D scene)', () => {
+  const parse = (scene: Record<string, unknown>) => explainerSchema.safeParse({ version: '1.0', topic: 'T', scenes: [{ kind: 'world', ...scene }] });
+
+  it('has a place, a move and a mood by default, and refuses unknown ones', () => {
+    const result = parse({});
+    expect(result.success).toBe(true);
+    expect(result.data!.scenes[0]).toMatchObject({ world: 'city', move: 'auto', mood: 'night', seed: 3 });
+    expect(parse({ world: 'ocean' }).success).toBe(false);
+    expect(parse({ mood: 'midnight' }).success).toBe(false);
+  });
+
+  it('lasts at least 8 seconds, hands its picture to the React build, and has a fixed-scene card as a fallback', () => {
+    const spec = explainerSchema.parse({ version: '1.0', topic: 'T', scenes: [{ kind: 'world', world: 'racks', title: 'Inside' }] });
+    const react = compileExplainer(spec, { reactKinds: REACT_KINDS });
+    expect(react.react?.scenes.map(item => item.scene.kind)).toEqual(['world']);
+    expect(((react.composition as any).scenes[0].durationFrames)).toBeGreaterThanOrEqual(240);
+    const stock = compileExplainer(spec).composition as any;
+    expect(stock.scenes[0].layers.some((layer: any) => layer.id === 'world-title' && layer.content === 'Inside')).toBe(true);
+  });
+
+  it('is written into a video that loads the 3D module, and only then', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mr-world-'));
+    try {
+      const withWorld = explainerSchema.parse({ version: '1.0', topic: 'T', scenes: [{ kind: 'world', title: 'Hello' }] });
+      const built = await buildExplainer(withWorld, { output: join(dir, 'composition.json'), voice: false, react: true });
+      expect(built.react).toBe(true);
+      expect(readFileSync(join(dir, 'explainer-react.tsx'), 'utf8')).toContain("from 'motionrender/world'");
+      const plain = explainerSchema.parse({ version: '1.0', topic: 'T', scenes: [{ kind: 'stat', value: '1', label: 'one' }] });
+      await buildExplainer(plain, { output: join(dir, 'composition.json'), voice: false, react: true });
+      expect(readFileSync(join(dir, 'explainer-react.tsx'), 'utf8')).not.toContain('motionrender/world');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }, 120000);
+});
+
 describe('the React explainer build', () => {
   it('leaves only the kinds with a React drawing to the React build', () => {
-    expect([...REACT_KINDS].sort()).toEqual(['chart', 'closing', 'code', 'compare', 'flow', 'freeform', 'grid', 'hex', 'media', 'phone', 'pile', 'quote', 'stat', 'steps', 'timeline', 'title']);
+    expect([...REACT_KINDS].sort()).toEqual(['chart', 'closing', 'code', 'compare', 'flow', 'freeform', 'grid', 'hex', 'media', 'phone', 'pile', 'quote', 'stat', 'steps', 'timeline', 'title', 'world']);
     const { composition, react } = compileExplainer(script(), { reactKinds: REACT_KINDS });
     expect(react?.scenes.map(item => item.scene.kind)).toEqual(['title', 'compare', 'chart', 'stat']);
     expect(react?.scenes.map(item => item.sceneId)).toEqual(['s1-title', 's2-compare', 's3-chart', 's4-stat']);
@@ -94,4 +128,13 @@ describe('the React explainer build', () => {
       expect(built.notes.join(' ')).toMatch(/4 scenes drawn with React components \((title, compare, chart, stat)\)/);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   }, 60000);
+});
+
+
+// A 3D canvas costs time by the pixel, so the world draws it at the render scale: the page publishes the scale and the world reads it.
+describe('the render scale reaching the 3D world', () => {
+  it('is set by the canvas runtime and read by the world renderer', () => {
+    expect(readFileSync('packages/graphics/runtime/canvas-runtime.js', 'utf8')).toContain('globalThis.__oveRenderScale=p.scaleX||1');
+    expect(readFileSync('packages/react/src/world.ts', 'utf8')).toContain('__oveRenderScale');
+  });
 });

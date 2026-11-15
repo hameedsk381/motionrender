@@ -118,6 +118,14 @@ export const explainerSceneSchema = z.discriminatedUnion('kind', [
     code: z.string().trim().min(1).max(900).refine(value => value.split('\n').length <= 14, 'At most 14 lines: show the few lines that matter, not a file').describe('The code, as plain text with real line breaks: at most 14 lines and about 40 characters a line, so it reads on a phone.'),
     highlight: z.array(z.number().int().min(1).max(14)).max(6).default([]).describe('Line numbers (from 1) to pick out one after another as the scene plays, in the order they are talked about'),
     caption: words(120).optional().describe('One sentence at the bottom of the screen') }),
+  z.object({ kind: z.literal('world'), ...common,
+    world: z.enum(['city', 'terrain', 'racks']).default('city').describe('The place: city (blocks of lit buildings and moving car lights), terrain (hills, a shoreline and trees) or racks (a data-centre aisle with blinking lights)'),
+    move: z.enum(['auto', 'flyover', 'orbit', 'dolly', 'crane']).default('auto').describe('How the camera moves: flyover (forward over the world), orbit (around it), dolly (straight down an aisle), crane (rising). auto picks the usual one for the place.'),
+    mood: z.enum(['night', 'dusk', 'dawn', 'noon']).default('night').describe('The light: night, dusk, dawn or noon'),
+    seed: z.number().int().min(0).max(9999).default(3).describe('Changes the layout of the world: the same seed is always the same world'),
+    title: words(60).optional().describe('Large words over the lower part of the picture'),
+    caption: words(120).optional().describe('One sentence under the title'),
+    duration: z.number().min(4).max(30).optional().describe('At least this many seconds (a world scene lasts 8 s or its spoken line, whichever is longer)') }),
   z.object({ kind: z.literal('freeform'), ...common,
     elements: z.array(freeformElementSchema).min(1).max(80).describe('What is on the board, placed by you on a 1080 x 1920 column: text, boxes (also lines and bars: a thin box) and circles. Keep text between y 270 and y 1540 and left of x 960, where reel apps do not cover it.'),
     duration: z.number().min(2).max(30).optional().describe('At least this many seconds, when the picture needs longer than its spoken line'),
@@ -178,4 +186,4 @@ export type ExplainerInput = z.input<typeof explainerSchema>;
 export type ExplainerScene = z.infer<typeof explainerSceneSchema>;
 export type FreeformElement = z.infer<typeof freeformElementSchema>;
 /** The scene kinds, for prompts and menus. */
-export const explainerKinds = ['title', 'flow', 'grid', 'steps', 'compare', 'stat', 'chart', 'timeline', 'pile', 'media', 'phone', 'hex', 'quote', 'code', 'freeform', 'closing'] as const;
+export const explainerKinds = ['title', 'flow', 'grid', 'steps', 'compare', 'stat', 'chart', 'timeline', 'pile', 'media', 'phone', 'hex', 'quote', 'code', 'world', 'freeform', 'closing'] as const;

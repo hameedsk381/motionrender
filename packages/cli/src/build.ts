@@ -19,6 +19,11 @@ export async function buildReact(source: string, output: string): Promise<void> 
     ? fileURLToPath(new URL('./react.js', import.meta.url))
     : fileURLToPath(new URL('../../react/src/index.ts', import.meta.url));
 
+  // The 3D world is its own file (it carries three.js): only a video that imports it pays for it.
+  const worldEntry = existsSync(fileURLToPath(new URL('./world.js', import.meta.url)))
+    ? fileURLToPath(new URL('./world.js', import.meta.url))
+    : fileURLToPath(new URL('../../react/src/world.ts', import.meta.url));
+
   // A video written outside any project (a generated one in a scratch folder) has no node_modules of its own: fall back to the react
   // this install resolves, so `import 'react'` works wherever the file lives. A project's own copy still wins, as it is looked up first.
   const nodePaths: string[] = [];
@@ -42,6 +47,7 @@ export async function buildReact(source: string, output: string): Promise<void> 
       '@remotion/media': reactEntry,
       '@ove/react': reactEntry,
       'motionrender/react': reactEntry,
+      'motionrender/world': worldEntry,
     },
     loader: { '.woff': 'dataurl', '.woff2': 'dataurl', '.ttf': 'dataurl', '.otf': 'dataurl', '.png': 'dataurl', '.jpg': 'dataurl', '.jpeg': 'dataurl', '.gif': 'dataurl', '.webp': 'dataurl', '.svg': 'dataurl' } as Record<string, 'dataurl'>,
   };

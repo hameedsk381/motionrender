@@ -417,6 +417,13 @@ const code: Kind<'code'> = (s, i) => ({ min: 180 + (s.highlight?.length ?? 0) * 
   return [...layers, ...caption('caption', s.caption, y + barH + bodyH + 50, at(frames, 0.55)), sfx('whoosh', 0, 0.2), ...s.highlight.map((_, k) => sfx('tick', first + k * span, 0.2))];
 } });
 
+/* ---- world: a 3D scene is drawn by the React build; the fixed scenes show a card that says so ---- */
+const world: Kind<'world'> = (s, i) => ({ min: Math.max(8 * FPS, Math.round((s.duration ?? 0) * FPS)), layers: frames => [...kicker(i, s.step),
+  rect('world-panel', 60, 330, 960, 900, { radius: 28, fill: '{{surface}}', anims: [fade(2, 14)] }),
+  center('world-title', s.title ?? `${s.world} · ${s.move}`, 700, { font: '{{fontDisplay}}', weight: 900, size: 84, color: GOLD, maxWidth: 820, maxLines: 3, minSize: 48, lh: 1.05, anims: [rise(700, 6, 40, 26)] }),
+  center('world-note', 'A 3D scene: the React build draws it (mr make, without --no-react).', 1010, { size: 28, color: '{{muted}}', maxWidth: 780, lh: 1.3, anims: [fade(16, 12)] }),
+  ...caption('caption', s.caption, 1300, at(frames, 0.6)), sfx('whoosh', 0, 0.2)] });
+
 const quote: Kind<'quote'> = (s, i) => ({ min: 150, layers: frames => {
   const size = 52, lineH = Math.round(size * 1.25), top = 330, lines = Math.max(1, Math.ceil(s.text.length / 28)), textTop = top + 215, cardH = 215 + lines * lineH + 70;
   const start = at(frames, 0.12), meta = [s.byline, s.date].filter(Boolean).join(' · '), tone = s.stamp ? TONES[s.stamp.tone] : GOLD;
@@ -477,7 +484,7 @@ export function autoLayout(scene: ExplainerScene, fallback: 'card' | 'editorial'
   }
 }
 
-const kinds: { [K in ExplainerScene['kind']]: Kind<K> } = { title: pick(title, titleEditorial), flow, grid, steps: pick(steps, stepsEditorial), compare, stat: pick(stat, statEditorial), chart, timeline, pile, media, phone, hex, quote, code, freeform, closing: pick(closing, closingEditorial) };
+const kinds: { [K in ExplainerScene['kind']]: Kind<K> } = { title: pick(title, titleEditorial), flow, grid, steps: pick(steps, stepsEditorial), compare, stat: pick(stat, statEditorial), chart, timeline, pile, media, phone, hex, quote, code, world, freeform, closing: pick(closing, closingEditorial) };
 
 /* ---- the whole video ---- */
 const theme = {
@@ -495,7 +502,7 @@ export type ExplainerReactScene = { sceneId: string; index: number; scene: Expla
 export type ExplainerReactLook = { palette: Record<string, string | number>; motion: Active['motion']; cornerScale: number; weightCap: number };
 export type ExplainerCompiled = { composition: Record<string, unknown>; notes: string[]; react?: { scenes: ExplainerReactScene[]; look: ExplainerReactLook } };
 /** The scene kinds that have a React drawing (packages/react/src/explainer-view.ts). */
-export const REACT_KINDS = ['title', 'steps', 'compare', 'stat', 'chart', 'timeline', 'quote', 'flow', 'grid', 'closing', 'freeform', 'phone', 'hex', 'pile', 'media', 'code'] as const;
+export const REACT_KINDS = ['title', 'steps', 'compare', 'stat', 'chart', 'timeline', 'quote', 'flow', 'grid', 'closing', 'freeform', 'phone', 'hex', 'pile', 'media', 'code', 'world'] as const;
 const REACT_MIN_FRAMES = 5 * FPS;
 /** The sounds a stock scene of this kind would make, for the same moments, so a React scene is not quieter than the one it replaces. */
 function reactCues(scene: ExplainerScene, frames: number): Layer[] {
@@ -515,6 +522,7 @@ function reactCues(scene: ExplainerScene, frames: number): Layer[] {
     case 'hex': return [whoosh, ...each(n(s.lit ?? [0, 1, 2, 3], 4), at(frames, 0.3), 10, 'pop', 0.2)];
     case 'quote': return [whoosh, sfx('pop', at(frames, 0.2), 0.25), sfx('ding', at(frames, 0.45), 0.25)];
     case 'phone': return [whoosh, ...(s.messages ?? []).slice(0, 5).map((m: { side?: string }, k: number) => sfx(m.side === 'out' ? 'pop' : 'ding', 14 + k * 22, 0.2))];
+    case 'world': return [whoosh, sfx('riser', 0, 0.15)];
     case 'code': return [whoosh, ...each(n(s.highlight, 6), 40, 40, 'tick', 0.2)];
     case 'closing': return [whoosh, sfx('thump', 18, 0.35), sfx('ding', at(frames, 0.6), 0.25)];
     default: return [whoosh];
@@ -602,7 +610,7 @@ function compileWith(spec: Explainer, options: CompileOptions, palette: Record<s
   const scenes = spec.scenes.map((scene, i) => {
     // A scene may pick its own layout (card or editorial), so a video is not one template from start to end.
     if (reactable.includes(scene.kind)) {
-      const spoken = options.audio?.[i], frames = Math.max(REACT_MIN_FRAMES, scene.kind === 'freeform' ? Math.round((scene.duration ?? 0) * FPS) : 0, spoken ? Math.ceil((spoken.seconds + 0.6) * FPS) + 8 : 0);
+      const spoken = options.audio?.[i], frames = Math.max(REACT_MIN_FRAMES, scene.kind === 'freeform' || scene.kind === 'world' ? Math.round((scene.duration ?? 0) * FPS) : 0, scene.kind === 'world' ? 8 * FPS : 0, spoken ? Math.ceil((spoken.seconds + 0.6) * FPS) + 8 : 0);
       const cues = spec.captions && spoken?.words?.length ? groupCaptionWords(spoken.words, 6) : undefined, sentence = (scene as { caption?: string }).caption;
       const id = `s${i + 1}-${scene.kind}`;
       if (scene.kind === 'media' && !scene.src) throw new Error('A media scene that is still a prompt has no picture yet: make the pictures first (mr explainer compile does, with an image model)');

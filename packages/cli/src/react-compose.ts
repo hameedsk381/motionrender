@@ -35,13 +35,15 @@ export async function convertToReact(raw: unknown, outputPath: string, options: 
   const assets = [...(composition.assets ?? []), ...declared];
   const config = { id: composition.id, name: composition.name, width: composition.width, height: composition.height, fps: composition.fps, durationInFrames: composition.durationFrames,
     ...(composition.background !== undefined ? { background: composition.background } : {}), ...(composition.export ? { export: composition.export } : {}), ...(assets.length ? { assets } : {}) };
+  const hasWorld = !!explainer?.scenes.some(item => item.scene.kind === 'world');
   const source = [
     '// Written by MotionRender: this composition drawn as a React video. Edit the data, or write your own components instead.',
     `import { ${options.explainer ? 'ExplainerView' : 'CompositionView'} } from 'motionrender/react';`,
+    ...(hasWorld ? ["import { World } from 'motionrender/world';"] : []),
     `export const config = ${JSON.stringify(config, null, 2)};`,
     `export const layers = ${JSON.stringify(audio, null, 2)};`,
     `const composition = ${JSON.stringify(data)};`,
-    ...(explainer ? [`const react = ${JSON.stringify(explainer)};`, 'export default function Video() { return <ExplainerView composition={composition as any} react={react as any} />; }']
+    ...(explainer ? [`const react = ${JSON.stringify(explainer)};`, 'export default function Video() { return <ExplainerView composition={composition as any} react={react as any}' + (hasWorld ? ' extras={{ World }}' : '') + ' />; }']
       : ['export default function Video() { return <CompositionView composition={composition as any} />; }']),
     '',
   ].join('\n');

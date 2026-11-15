@@ -415,33 +415,42 @@ function code(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement {
 
 const drawings: Record<string, (ctx: Ctx, scene: Record<string, any>, variant: string) => ReactElement> = { compare, chart, flow, grid, steps, timeline, stat, quote, title, closing, freeform, phone, hex, pile, media, code };
 /** Variants each scene kind knows, for `variant` in the script and for the error that lists them. */
-export const explainerVariants: Record<string, string[]> = { compare: ['split', 'stacked', 'versus'], chart: ['columns', 'rows', 'line'], flow: ['funnel', 'chain'], grid: ['board', 'spotlight'], steps: ['list', 'ladder', 'cards', 'bento'], timeline: ['spine', 'zigzag'], stat: ['hero', 'ring', 'stacked'], quote: ['card', 'pull', 'typed'], title: ['poster', 'centred'], closing: ['takeaway', 'poster'], freeform: [], phone: ['handset', 'thread'], hex: [], pile: [], media: ['frame', 'split', 'browser'], code: ['editor', 'typed'] };
+export const explainerVariants: Record<string, string[]> = { compare: ['split', 'stacked', 'versus'], chart: ['columns', 'rows', 'line'], flow: ['funnel', 'chain'], grid: ['board', 'spotlight'], steps: ['list', 'ladder', 'cards', 'bento'], timeline: ['spine', 'zigzag'], stat: ['hero', 'ring', 'stacked'], quote: ['card', 'pull', 'typed'], title: ['poster', 'centred'], closing: ['takeaway', 'poster'], freeform: [], phone: ['handset', 'thread'], hex: [], pile: [], media: ['frame', 'split', 'browser'], code: ['editor', 'typed'], world: [] };
 
-function ReactSceneView({ item, look, shell, size }: { item: ReactScene; look: Look; /** The composition scene this belongs to, for its transition. */ shell?: Record<string, any>; size: { width: number; height: number } }): ReactElement | null {
+/** Pieces that come from their own module because they are large (the 3D world brings three.js): a video without such a scene never loads them. */
+export type ExplainerExtras = { World?: (props: Record<string, unknown>) => ReactElement };
+
+function ReactSceneView({ item, look, shell, size, extras }: { item: ReactScene; look: Look; /** The composition scene this belongs to, for its transition. */ shell?: Record<string, any>; size: { width: number; height: number }; extras?: ExplainerExtras }): ReactElement | null {
   const frame = useCurrentFrame();
   const draw = drawings[item.scene.kind as string];
-  if (!draw) return null;
+  if (!draw && item.scene.kind !== 'world') return null;
   const band: Band = { top: 270, bottom: item.captions ? 1300 : 1540 }, scene = item.scene;
   const variant = scene.variant && explainerVariants[scene.kind]?.includes(scene.variant) ? scene.variant : 'auto';
   const fit = Math.min(size.width / W, size.height / 1920), column: Column = { fit, ox: (size.width - W * fit) / 2, oy: (size.height - 1920 * fit) / 2 };
   const ctx = { look, frame, frames: item.frames, band, captions: item.captions, column } as Ctx;
   // The scene comes in the way the look's other scenes do (fade, zoom, wipe or push): the same transition the stock view draws.
   const entrance = sceneStyle(shell ? transitionAt({ ...shell, durationFrames: item.frames }, frame) : undefined, size.width, size.height);
+  // A 3D world fills the whole frame, whatever its shape, instead of the 1080 x 1920 column: it is a picture, not a layout.
+  if (scene.kind === 'world') {
+    if (!extras?.World) return null;
+    return h('div', { style: entrance }, h(extras.World, { world: scene.world ?? 'city', move: scene.move ?? 'auto', mood: scene.mood ?? 'night', seed: scene.seed ?? 3, frames: item.frames, width: size.width, height: size.height,
+      accent: col(ctx, 'accent'), accent2: col(ctx, 'accent2'), text: col(ctx, 'text'), fontDisplay: String(look.palette.fontDisplay ?? 'Inter'), title: scene.title, caption: item.captions ? undefined : scene.caption }));
+  }
   const kicker = scene.step ? h('div', { key: 'kicker', style: { ...box({ left: 60, top: 206 }), ...mono(ctx), fontSize: 22, letterSpacing: 4, color: col(ctx, 'muted'), opacity: clamp((frame - 2) / 12) } }, `— ${scene.step}`) : null;
   const glow = ['title', 'stat', 'closing', 'quote'].includes(scene.kind) ? h(AmbientGlow, { key: 'glow', blur: 120, orbs: [{ x: '22%', y: '34%', size: 700, color: col(ctx, 'accent'), opacity: 0.16, speed: 0.025 }, { x: '82%', y: '68%', size: 600, color: col(ctx, 'accent2'), opacity: 0.12, speed: 0.03, phase: 2 }] }) : null;
   const drift = scene.kind === 'media' ? undefined : `scale(${1 + 0.02 * clamp(frame / Math.max(1, item.frames))})`;
   // The scene is drawn on the 1080 x 1920 column; the column is scaled and centred in the frame (a no-op for a vertical video).
   return h('div', { style: entrance }, h('div', { style: { position: 'absolute', left: column.ox, top: column.oy, width: W, height: 1920, transformOrigin: '0 0', transform: `scale(${fit})` } },
-    h('div', { style: { position: 'absolute', left: 0, top: 0, width: W, height: 1920, transform: drift, transformOrigin: '50% 50%' } }, glow, kicker, draw(ctx, scene, variant))));
+    h('div', { style: { position: 'absolute', left: 0, top: 0, width: W, height: 1920, transform: drift, transformOrigin: '50% 50%' } }, glow, kicker, draw!(ctx, scene, variant))));
 }
 
 /** The explainer's stock composition drawn by CompositionView, with the React scenes in their own time ranges underneath its captions and header. */
-export function ExplainerView({ composition, react, assets = {} }: { composition: CompositionData; react: ExplainerReactData; assets?: Record<string, string> }): ReactElement {
+export function ExplainerView({ composition, react, assets = {}, extras }: { composition: CompositionData; react: ExplainerReactData; assets?: Record<string, string>; extras?: ExplainerExtras }): ReactElement {
   const starts = new Map(composition.scenes.map(scene => [scene.id, Number(scene.startFrame ?? 0)])), shells = new Map(composition.scenes.map(scene => [scene.id, scene as Record<string, any>]));
   const overlay = (composition as any).overlay as Record<string, any>[] | undefined;
   // The header and footer are overlay layers the renderer draws for JSON videos; here they are one more scene lasting the whole video.
   const stock: CompositionData = overlay?.length ? { ...composition, scenes: [...composition.scenes, { id: 'overlay', startFrame: 0, durationFrames: composition.durationFrames, layers: overlay }] } : composition;
   return h('div', { style: { position: 'absolute', left: 0, top: 0, width: composition.width, height: composition.height } },
-    ...react.scenes.map(item => h(Sequence, { key: item.sceneId, from: starts.get(item.sceneId) ?? 0, durationInFrames: item.frames }, h(ReactSceneView, { item, look: react.look, shell: shells.get(item.sceneId), size: { width: composition.width, height: composition.height } }))),
+    ...react.scenes.map(item => h(Sequence, { key: item.sceneId, from: starts.get(item.sceneId) ?? 0, durationInFrames: item.frames }, h(ReactSceneView, { item, look: react.look, shell: shells.get(item.sceneId), size: { width: composition.width, height: composition.height }, extras }))),
     h(CompositionView, { composition: stock, assets }));
 }

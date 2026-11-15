@@ -15,6 +15,7 @@ const common={ bundle: true, platform: 'node', format: 'esm', target: 'node22', 
 await build({ ...common, entryPoints: [join(root, 'packages/core/src/index.ts')], outfile: join(dist, 'index.js') });
 await build({ ...common, entryPoints: [join(root, 'packages/cli/src/index.ts')], outfile: join(dist, 'cli.js') });
 await build({ ...common, platform: 'neutral', banner: undefined, entryPoints: [join(root, 'packages/builder/src/index.ts')], outfile: join(dist, 'builder.js') });
+await build({ ...common, platform: 'browser', banner: undefined, external: ['react', '@ove/react'], entryPoints: [join(root, 'packages/react/src/world.ts')], outfile: join(dist, 'world.js') }); // the 3D worlds for explainer videos: three.js is inside, the React runtime is the video's own (aliased from '@ove/react')
 await build({ ...common, platform: 'neutral', banner: undefined, external: ['react'], entryPoints: [join(root, 'packages/react/src/index.ts')], outfile: join(dist, 'react.js') }); // components for React videos; React itself is the project's // the code-as-video API: plain JavaScript, no dependencies // keeps the source's #! line
 // Declarations: emit for every workspace package, then rewrite '@ove/x' to the relative path of x's emitted index, and give
 // extensionless relative imports a .js extension so NodeNext consumers resolve them.
