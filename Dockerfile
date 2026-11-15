@@ -92,7 +92,7 @@ WORKDIR /site
 COPY site/ ./
 RUN APP_URL="$APP_URL" node build.mjs
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS site
+FROM nginxinc/nginx-unprivileged:1.31-alpine AS site
 COPY infrastructure/site/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=site-build /site/index.html /usr/share/nginx/html/index.html
 COPY --from=site-build /site/media /usr/share/nginx/html/media
