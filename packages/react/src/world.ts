@@ -198,7 +198,7 @@ export function World(props: WorldProps): ReactElement {
     if (!canvas.current) return;
     if (!state.current) state.current = build(props, canvas.current);
     state.current.update(frame);
-  }, [frame, props.width, props.height]);
+  }, [frame, props]);   // every render draws: the picture is a function of the frame and the props
   const tall = props.height > props.width, rise = clamp((frame - 14) / 26);
   return h('div', { style: { position: 'absolute', left: 0, top: 0, width: props.width, height: props.height, overflow: 'hidden' } },
     h('canvas', { ref: canvas, width: props.width, height: props.height, style: { position: 'absolute', left: 0, top: 0, width: props.width, height: props.height } }),
