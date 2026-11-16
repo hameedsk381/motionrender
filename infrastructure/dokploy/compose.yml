@@ -3,7 +3,7 @@
 # In Dokploy: create a Compose project, point it at this repo, set the compose path to
 # infrastructure/dokploy/compose.yml, and fill in the environment variables in the Environment tab.
 #
-# Dokploy's Traefik handles TLS and routing. In the Domains tab, set the app's subdomain for the `api` service (port 3100) and the main domain for the `site` service (port 8080).
+# Dokploy's Traefik handles TLS and routing: the `api` service's labels send the host to port 3100, where the API serves the landing page (/) and the web app (/app/).
 # The same stack is at the repo root as docker-compose.yml (a test keeps the two in step).
 # The render worker has no network route out — it can reach Redis and the shared data volume and nothing else.
 
@@ -76,17 +76,17 @@ services:
       WEBHOOK_SECRET: "${WEBHOOK_SECRET:-}"
     volumes: ["data:/data"]
     networks: [dokploy-network, internal]
-    # Traefik (Dokploy) routes the app's host to the API on port 3100. APP_HOST is that host (default app.motionrender.io): it must also be PUBLIC_ORIGIN, as https://<APP_HOST>.
-    # The main domain is the landing page, on the `site` service below. If you also add a host in Dokploy's Domains tab, remove that entry so two routers do not claim it.
+    # Traefik (Dokploy) routes the host to the API on port 3100. The API serves the landing page at / and the web app at /app/, so one host is enough.
+    # APP_HOST is that host (default motionrender.io): it must also be PUBLIC_ORIGIN, as https://<APP_HOST>. If you also add the host in Dokploy's Domains tab, remove that entry so two routers do not claim it.
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=dokploy-network"
-      - "traefik.http.routers.motionrender-api-web.rule=Host(`${APP_HOST:-app.motionrender.io}`)"
+      - "traefik.http.routers.motionrender-api-web.rule=Host(`${APP_HOST:-motionrender.io}`)"
       - "traefik.http.routers.motionrender-api-web.entrypoints=web"
       - "traefik.http.routers.motionrender-api-web.service=motionrender-api-web"
       - "traefik.http.routers.motionrender-api-web.middlewares=redirect-to-https@file"
       - "traefik.http.services.motionrender-api-web.loadbalancer.server.port=3100"
-      - "traefik.http.routers.motionrender-api-websecure.rule=Host(`${APP_HOST:-app.motionrender.io}`)"
+      - "traefik.http.routers.motionrender-api-websecure.rule=Host(`${APP_HOST:-motionrender.io}`)"
       - "traefik.http.routers.motionrender-api-websecure.entrypoints=websecure"
       - "traefik.http.routers.motionrender-api-websecure.service=motionrender-api-websecure"
       - "traefik.http.routers.motionrender-api-websecure.tls.certresolver=letsencrypt"
@@ -99,39 +99,6 @@ services:
       interval: 30s
       timeout: 5s
       start_period: 20s
-      retries: 3
-
-  # The landing page, for the main domain (the app is on a subdomain, see docs/hosting.md). In Dokploy's Domains tab add the main domain for this
-  # service on port 8080. It makes no calls to the API. The app's address is PUBLIC_ORIGIN, so the page's "Open the app" link needs no setting of its own.
-  site:
-    <<: *hardening
-    build: { context: ../.. , dockerfile: Dockerfile, target: site, args: { APP_URL: "${PUBLIC_ORIGIN}" } }
-    init: true
-    read_only: true
-    tmpfs: ["/tmp"]
-    pids_limit: 64
-    mem_limit: 128m
-    expose: ["8080"]
-    networks: [dokploy-network]
-    # The main domain (SITE_HOST, default motionrender.io) shows the landing page, which makes no calls to the API.
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=dokploy-network"
-      - "traefik.http.routers.motionrender-site-web.rule=Host(`${SITE_HOST:-motionrender.io}`)"
-      - "traefik.http.routers.motionrender-site-web.entrypoints=web"
-      - "traefik.http.routers.motionrender-site-web.service=motionrender-site-web"
-      - "traefik.http.routers.motionrender-site-web.middlewares=redirect-to-https@file"
-      - "traefik.http.services.motionrender-site-web.loadbalancer.server.port=8080"
-      - "traefik.http.routers.motionrender-site-websecure.rule=Host(`${SITE_HOST:-motionrender.io}`)"
-      - "traefik.http.routers.motionrender-site-websecure.entrypoints=websecure"
-      - "traefik.http.routers.motionrender-site-websecure.service=motionrender-site-websecure"
-      - "traefik.http.routers.motionrender-site-websecure.tls.certresolver=letsencrypt"
-      - "traefik.http.services.motionrender-site-websecure.loadbalancer.server.port=8080"
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
-      interval: 30s
-      timeout: 5s
-      start_period: 10s
       retries: 3
 
   worker-render:

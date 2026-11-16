@@ -10,7 +10,10 @@ describe('the two Dokploy compose files', () => {
     expect(code('docker-compose.yml')).toBe(code('infrastructure/dokploy/compose.yml'));
   });
 
-  it('carry the landing page service', () => {
-    expect(code('docker-compose.yml')).toMatch(/\n  site:\n/);
+  it('send the host to the API on port 3100, which serves the landing page and the web app, with no separate web server for the page', () => {
+    const text = code('docker-compose.yml');
+    expect(text).not.toMatch(/\n  site:\n/);
+    expect(text).toContain('loadbalancer.server.port=3100');
+    expect(text).not.toContain('loadbalancer.server.port=8080');
   });
 });

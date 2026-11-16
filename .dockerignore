@@ -11,6 +11,7 @@ still.png
 package-lock.json
 packages/ove/dist
 packages/ove/studio
+packages/ove/site
 packages/ove/starter
 packages/ove/skills
 packages/cli/studio

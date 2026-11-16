@@ -5,12 +5,13 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-/** The address of the hosted app: https, or http on localhost for a local test. Anything else is refused, so it can never break out of the attribute it is written into. */
+/** The address of the hosted app: https, http on localhost for a local test, or a path on the same host such as /app/. Anything else is refused, so it can never break out of the attribute it is written into. */
 export function checkAppUrl(value) {
   const url = String(value ?? '').trim();
   if (url === '') return '';
+  if (/^\/(?!\/)[A-Za-z0-9\-._~/]*$/.test(url)) return url;   // a path on the same host (not //host, which is another site)
   const https = /^https:\/\/[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{1,5})?(\/[^\s"'<>`]*)?$/i, local = /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?(\/[^\s"'<>`]*)?$/i;
-  if (!https.test(url) && !local.test(url)) throw new Error(`APP_URL must be an https:// address (or http://localhost for a test), got "${url}"`);
+  if (!https.test(url) && !local.test(url)) throw new Error(`APP_URL must be an https:// address (or http://localhost for a test, or a path such as /app/), got "${url}"`);
   return url;
 }
 

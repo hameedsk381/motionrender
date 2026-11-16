@@ -5,7 +5,12 @@ import { createAccounts, createApp, createQuotas, consoleMailer, PgUserStore } f
 import { RedisQueue, createJobRunner, redisConnection } from '@ove/jobs';
 import { AiSettingsStore, FsProjectStore, StockSettingsStore, type Principal } from '@ove/storage';
 import { runWorker } from '@ove/worker';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { jobEnvFor, studioApp, studioLibrary, studioPlayer } from './ai-studio';
+
+/** The landing page: built into the package (site/), or the repository's own site/ when run from source. Without one the web app is at '/'. */
+const landingDir = [new URL('../site', import.meta.url), new URL('../../../site', import.meta.url)].map(url => fileURLToPath(url)).find(dir => existsSync(dir + '/index.html'));
 import { readApiConfig, readWorkerConfig } from './serve-config';
 import { makeThumbnail } from './thumbnail';
 
@@ -19,13 +24,13 @@ export async function runServe(env: NodeJS.ProcessEnv = process.env): Promise<vo
   const queue = new RedisQueue(redisConnection(config.redisUrl), hideStorage(root));
   // Jobs are checked here and run by the workers; the API holds no AI key and starts no browser.
   const runner = createJobRunner(jobEnvFor(store, () => { throw new Error('AI work runs on the job workers'); }, () => ({}), false));
-  const auth = createAccounts({ users, publicOrigin, secureCookies: secure, trustProxy: config.trustProxy, requireVerified: config.requireVerified, signups: config.signups, mailer: consoleMailer });
+  const auth = createAccounts({ users, publicOrigin, appPath: landingDir ? '/app' : '', secureCookies: secure, trustProxy: config.trustProxy, requireVerified: config.requireVerified, signups: config.signups, mailer: consoleMailer });
   const quotas = createQuotas({ users, limits: config.limits, storageUsed: who => store.usedBytes(who) });
   const publicHost = new URL(publicOrigin).host.replace(/:\d+$/, '');
   // The service holds no AI key. Each person connects their own in Settings; it is stored encrypted under SETTINGS_SECRET.
   const aiSettings = new AiSettingsStore(store, config.settingsSecret);
   const app = createApp({
-    mode: 'hosted', store, queue, validate: runner.validate, auth, quotas, library: studioLibrary, player: studioPlayer, app: studioApp,
+    mode: 'hosted', store, queue, validate: runner.validate, auth, quotas, library: studioLibrary, player: studioPlayer, app: studioApp, ...(landingDir ? { landing: { dir: landingDir } } : {}),
     makeThumbnail: async () => { throw new Error('Thumbnails are drawn by the render workers'); },
     providerState: () => ({ provider: null, error: null }), aiSettings, stockSettings: new StockSettingsStore(store, config.settingsSecret),
     // 127.0.0.1 and localhost are listed so a container health check can ask; they cannot be reached by a web page on another site.

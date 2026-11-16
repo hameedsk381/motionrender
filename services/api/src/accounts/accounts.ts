@@ -28,6 +28,8 @@ export type AccountsOptions = {
   mailer?: Mailer;
   /** Where links in emails point (the studio's public address). */
   publicOrigin: string;
+  /** Where the web app is, below the public address: '/app' when a landing page is at '/', else ''. */
+  appPath?: string;
   /** Mark the session cookie Secure (behind HTTPS). */
   secureCookies?: boolean;
   /** Read the client address from X-Forwarded-For (only behind a proxy you control). */
@@ -62,7 +64,7 @@ export function createAccounts(options: AccountsOptions): Auth & { routes(): Rou
   async function sendLink(userId: string, email: string, kind: 'verify' | 'reset') {
     const token = randomBytes(32).toString('base64url');
     await users.putToken({ hash: sha(token), userId, kind, expiresAt: Date.now() + (kind === 'reset' ? 3_600_000 : 86_400_000) });
-    const link = `${publicOrigin}/#/${kind}/${token}`;
+    const link = `${publicOrigin}${options.appPath ?? ''}/#/${kind}/${token}`;
     await mailer.send(email, kind === 'reset' ? 'Reset your OVE password' : 'Confirm your email for OVE', kind === 'reset' ? `Open this link within an hour to choose a new password:\n${link}\n\nIf you did not ask for this, ignore this message.` : `Open this link to confirm your email:\n${link}`);
   }
   const view = (user: { id: string; email: string; verifiedAt?: number }) => ({ id: user.id, email: user.email, verified: !!user.verifiedAt });

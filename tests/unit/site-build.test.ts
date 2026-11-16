@@ -30,8 +30,8 @@ describe('the landing page build', () => {
     expect(page.match(/href="https:\/\/app\.example\.com"/g)?.length).toBe(2);
   });
 
-  it('accepts an https address with a port or a path, and http on localhost for a test', () => {
-    for (const ok of ['https://app.example.com', 'https://app.example.com:8443', 'https://example.com/studio', 'http://localhost:3100', 'http://127.0.0.1:3100/']) {
+  it('accepts an https address with a port or a path, http on localhost for a test, and a path on the same host', () => {
+    for (const ok of ['https://app.example.com', 'https://app.example.com:8443', 'https://example.com/studio', 'http://localhost:3100', 'http://127.0.0.1:3100/', '/app/', '/app']) {
       expect(() => site.checkAppUrl(ok), ok).not.toThrow();
     }
     expect(site.checkAppUrl('')).toBe('');
@@ -39,7 +39,7 @@ describe('the landing page build', () => {
   });
 
   it('refuses anything that is not a plain https address, or could break out of the link', () => {
-    for (const bad of ['javascript:alert(1)', 'http://example.com', 'ftp://example.com', 'https://x.com/" onmouseover="alert(1)', 'https://x.com/<script>', "https://x.com/'x", 'app.example.com', 'https://', 'data:text/html,hi']) {
+    for (const bad of ['javascript:alert(1)', 'http://example.com', 'ftp://example.com', 'https://x.com/" onmouseover="alert(1)', 'https://x.com/<script>', "https://x.com/'x", 'app.example.com', 'https://', 'data:text/html,hi', '//evil.example.com', '/app/"x', '/a b']) {
       expect(() => site.checkAppUrl(bad), bad).toThrow(/APP_URL/);
     }
   });

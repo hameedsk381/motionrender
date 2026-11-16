@@ -22,9 +22,8 @@ Each account is its own tenant. Every route, file read and job runs as that acco
 1. Install [Dokploy](https://dokploy.com) on your VPS.
 2. Create a **Compose** project and connect this GitHub repository. The `docker-compose.yml` at the repo root is the Dokploy compose file; `infrastructure/dokploy/compose.yml` is the same stack (a test keeps them identical), so either path works.
 3. In the **Environment** tab, add the variables from `infrastructure/dokploy/.env.example` — at minimum `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `PUBLIC_ORIGIN` and `SETTINGS_SECRET`.
-4. In the **Domains** tab, add a domain for the `api` service on port `3100`. Dokploy provisions the TLS certificate.
-   The compose file also carries Traefik labels, so no Domains-tab entry is needed: the `site` service (landing page, port `8080`) takes `${SITE_HOST:-motionrender.io}` and the `api` (the app and its login, port `3100`) takes `${APP_HOST:-app.motionrender.io}`. Set `PUBLIC_ORIGIN` to `https://` plus the app host, add a DNS record for both hosts, and do not also add either host in the Domains tab (two routers would claim it).
-5. Set `PUBLIC_ORIGIN` to the `https://` address Dokploy assigned (e.g. `https://studio.yourdomain.com`).
+4. The compose file carries Traefik labels that send `${APP_HOST:-motionrender.io}` to the `api` service on port `3100`, so no Domains-tab entry is needed (set `APP_HOST` to your host). If you add the host in the Domains tab as well, delete one of the two, or two routers will claim it. Dokploy provisions the TLS certificate.
+5. Set `PUBLIC_ORIGIN` to `https://` plus that host (e.g. `https://yourdomain.com`).
 6. Deploy.
 
 The compose file joins the API and AI worker to Dokploy's Traefik network for internet access, and keeps Postgres, Redis and the render worker on an internal network with no route out.
@@ -40,16 +39,13 @@ Without a compose tool, `infrastructure/docker/stack.sh up` starts the same cont
 
 Put a TLS proxy (Caddy or nginx) in front of `127.0.0.1:3100`, and set `PUBLIC_ORIGIN` to its `https://` address. The API checks the `Host` and `Origin` of every request against it. Set `TRUST_PROXY=1` (the default in the compose file) only when a proxy you control sets `X-Forwarded-For`.
 
-## A landing page on the main domain, the app on a subdomain
+## The landing page and the app on one host
 
-The landing page (`site/`) and the app are separate services, so each gets its own domain: `yourdomain.com` for the page and `app.yourdomain.com` for the app. They share nothing. The page makes no calls to the API, so there is no cross-origin setup, and the app's sign-in cookie stays on the app's own address. (The app itself cannot sit under a path such as `/app` on the page's domain: it is built for the root of its own address and calls `/api/…` and `/files/…` from there.)
+The `api` service serves both, so one host and one container are enough: `https://yourdomain.com/` is the landing page (`site/`, with its clips and stills under `/media/`) and `https://yourdomain.com/app/` is the web app, with its sign-in. The page's "Open the app" buttons go to `/app/`, and the links in sign-up and password-reset emails point there too. The page and its media are open to everyone; the API behind them still needs a signed-in account.
 
-1. **DNS.** Point both names at the server: an `A` record for `yourdomain.com` and one for `app` (or a `CNAME` for `app`), each to the server's IP.
-2. **Environment tab.** Set `PUBLIC_ORIGIN=https://app.yourdomain.com`.
-3. **Domains tab.** Add `app.yourdomain.com` for the `api` service on port `3100`, and `yourdomain.com` for the `site` service on port `8080`. Turn HTTPS on for both.
-4. **Deploy.** The `site` service is built from `site/` on every deploy, with an "Open the app" link to `PUBLIC_ORIGIN`.
+The page is built into the package (`pnpm build:package` renders `site/page.html` with the app link and copies `site/media`), so the `api` image has it and there is no separate web server, image or domain to set up: DNS for the one host, `PUBLIC_ORIGIN` set to it, deploy.
 
-To change the page, edit `site/page.html` and run `node site/build.mjs` to preview `site/index.html` (set `APP_URL=https://app.yourdomain.com` to include the app link), then redeploy. The image alone: `docker build --target site --build-arg APP_URL=https://app.yourdomain.com -t motionrender-site .`.
+To change the page, edit `site/page.html` and run `node site/build.mjs` to preview `site/index.html` (set `APP_URL=/app/` to include the app link), then redeploy. When the API runs from the repository instead of the package it serves `site/index.html` as it is, which has no app link unless you built it with one. A server with no `site/` folder shows the web app at `/`, as the all-in-one local studio does.
 
 Not covered: redirecting `www` to the main domain, and the domain's email records.
 

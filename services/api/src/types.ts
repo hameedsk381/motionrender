@@ -56,6 +56,8 @@ export type AppDeps = {
   stock?: Partial<StockOptions>;
   /** The built web app, and the plain page to show when there is none. */
   app: { dir: string; fallbackPage: string };
+  /** The landing page (an index.html and its media folder). When given, the API serves it at `/` and the web app moves to `/app/`; without it the web app is at `/`. */
+  landing?: { dir: string };
   /** Host names the server answers to besides loopback, and the one origin that may change things (hosted behind TLS). */
   allowHosts?: string[];
   publicPort?: number;

@@ -23,7 +23,30 @@ export function publicRoutes(): Route[] {
     if (!within(dir, target)) return undefined;
     try { return (await stat(target)).isFile() ? target : undefined; } catch { return undefined; }
   };
+  // With a landing page, "/" is the page people see first and the web app lives under /app/ (its files stay where they are: the app's own page asks for them by absolute path).
+  const landingFile = async (c: Ctx, relative: string): Promise<string | undefined> => {
+    const dir = c.deps.landing?.dir; if (!dir) return undefined;
+    const target = resolve(dir, relative);
+    if (!within(dir, target)) return undefined;
+    try { return (await stat(target)).isFile() ? target : undefined; } catch { return undefined; }
+  };
+  const appPage = async (c: Ctx) => {
+    const index = await staticFile(c, '/');
+    return c.send(200, 'text/html; charset=utf-8', index ? await readFile(index) : c.deps.app.fallbackPage);
+  };
   return [
+    { method: 'GET', path: '/', open: true, handle: async c => {
+      const page = await landingFile(c, 'index.html');
+      return page ? c.send(200, 'text/html; charset=utf-8', await readFile(page)) : appPage(c);
+    } },
+    // The page's clips and stills: they never change under one name.
+    { method: 'GET', path: '/media/*', open: true, handle: async c => {
+      const file = await landingFile(c, decodeURIComponent(c.url.pathname.slice(1)));
+      if (!file) return c.send(404, 'text/plain', 'Not found');
+      await serveFile(c.req, c.res, file);
+    } },
+    { method: 'GET', path: '/app', open: true, handle: async c => { c.res.writeHead(302, { location: '/app/' }); c.res.end(); } },
+    { method: 'GET', path: '/app/', open: true, handle: async c => appPage(c) },
     { method: 'GET', path: '/p5.min.js', open: true, handle: async c => { const p5 = c.deps.player.p5; if (!p5) return c.json(404, { error: 'This server does not serve p5.js' }); c.send(200, 'text/javascript; charset=utf-8', await p5()); } },
     { method: 'GET', path: '/three-runtime.js', open: true, handle: async c => { const three = c.deps.player.three; if (!three) return c.json(404, { error: 'This server does not serve three.js' }); c.send(200, 'text/javascript; charset=utf-8', await three()); } },
     { method: 'GET', path: '/player.js', open: true, handle: async c => c.send(200, 'text/javascript; charset=utf-8', await c.deps.player.script()) },
