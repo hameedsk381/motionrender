@@ -1,7 +1,7 @@
 import { parseRequest, stockClearRequest, stockImportRequest, stockSettingsRequest } from '@ove/contracts';
 import { textOf } from '@ove/jobs';
 import { STOCK_PROVIDERS, type StockProviderId } from '@ove/storage';
-import { defaultStockOptions, downloadStock, searchStock, STOCK_KEY_URLS, STOCK_LABELS, STOCK_LICENSES, type StockKind, type StockOptions } from '../stock';
+import { defaultStockOptions, downloadStock, searchStock, STOCK_KEY_URLS, STOCK_LABELS, STOCK_LICENSES, STOCK_ORIENTATIONS, STOCK_SIZES, type StockKind, type StockOptions, type StockOrientation, type StockSize } from '../stock';
 import type { Ctx, Route } from '../types';
 
 const PHOTO_EXTS = ['.jpg', '.jpeg', '.png', '.webp'], VIDEO_EXTS = ['.mp4', '.webm', '.mov'];
@@ -40,7 +40,9 @@ export function stockRoutes(): Route[] {
       const page = Math.min(50, Math.max(1, Math.floor(Number(c.url.searchParams.get('page')) || 1)));
       const apiKey = keys(c).get(c.who)[provider];
       if (!apiKey) return c.json(409, { error: `Connect ${label} in Settings first`, code: 'not_connected' });
-      c.json(200, await searchStock(provider, apiKey, { q, kind, page }, options(c)));
+      // The shape and the smallest size are Pexels's: anything else asked for is left out rather than refused.
+      const orientation = STOCK_ORIENTATIONS.find(item => item === c.url.searchParams.get('orientation')) as StockOrientation | undefined, size = STOCK_SIZES.find(item => item === c.url.searchParams.get('size')) as StockSize | undefined;
+      c.json(200, await searchStock(provider, apiKey, { q, kind, page, ...(orientation ? { orientation } : {}), ...(size ? { size } : {}) }, options(c)));
     } },
     { method: 'POST', path: '/api/stock/import', handle: async c => {
       const request = parseRequest(stockImportRequest, await c.body()), id = textOf(request.id, 'project'), use = options(c);

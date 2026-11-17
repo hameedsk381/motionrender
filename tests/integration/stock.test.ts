@@ -120,6 +120,19 @@ describe('searching', () => {
     expect((await search('pexels', 'a')).status).toBe(400);
     expect((await search('nope', 'ocean')).status).toBe(400);
   });
+
+  it('passes a shape and a smallest size to Pexels, a shape to Pixabay photos only, and leaves out what a search does not take', async () => {
+    const searchWith = (provider: string, kind: string, extra: string) => call('GET', `/api/stock/search?provider=${provider}&q=shapes+${extra.replace(/W/g, '')}&kind=${kind}&page=1&${extra}`);
+    const last = () => new URL(hits[hits.length - 1]!, 'http://x').searchParams;
+    expect((await searchWith('pexels', 'video', 'orientation=portrait&size=medium')).status).toBe(200);
+    expect([last().get('orientation'), last().get('size')]).toEqual(['portrait', 'medium']);
+    await searchWith('pexels', 'photo', 'orientation=sideways&size=huge');   // not shapes Pexels knows: left out, not refused
+    expect([last().has('orientation'), last().has('size')]).toEqual([false, false]);
+    await searchWith('pixabay', 'photo', 'orientation=portrait&size=large');
+    expect([last().get('orientation'), last().has('size')]).toEqual(['vertical', false]);
+    await searchWith('pixabay', 'video', 'orientation=portrait');
+    expect(last().has('orientation')).toBe(false);
+  });
 });
 
 describe('bringing a result into a project', () => {

@@ -7,6 +7,8 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { explainerExample, explainerKindDocs, explainerLookDefs, explainerLooks, explainerSchema, type Explainer } from '@ove/schema';
 import { compileExplainer, REACT_KINDS, type ExplainerAudio } from '@ove/core';
 import { convertToReact } from './react-compose';
+import { fetchExplainerStock, needsStock } from './explainer-stock';
+import type { StockOptions } from '@ove/api';
 import { createProvider, generateExplainerImages, needsImages, researchFacts, sceneKinds, speakLine, wavSeconds, writeExplainer } from '@ove/ai';
 
 const option = (argv: string[], name: string) => { const index = argv.indexOf(name); return index < 0 ? undefined : argv[index + 1]; };
@@ -28,7 +30,7 @@ export { wavSeconds };
 /** `mr explainer write "what to explain"`: the model writes the script; compile it next. */
 async function writeCommand(argv: string[]): Promise<void> {
   const brief = argv[2];
-  if (!brief || brief.startsWith('--')) throw new Error('Usage: mr explainer write "what the video should explain" [--scenes 5] [--language English] [--voice <name>] [--media a.mp4,b.jpg] [--images] [--research] [--avoid a/explainer.json,b/explainer.json] [--output explainer.json]');
+  if (!brief || brief.startsWith('--')) throw new Error('Usage: mr explainer write "what the video should explain" [--scenes 5] [--language English] [--voice <name>] [--media a.mp4,b.jpg] [--images] [--stock] [--research] [--avoid a/explainer.json,b/explainer.json] [--output explainer.json]');
   const provider = createProvider({ provider: option(argv, '--provider'), model: option(argv, '--model'), baseUrl: option(argv, '--base-url') });
   const scenes = option(argv, '--scenes') === undefined ? undefined : Number(option(argv, '--scenes'));
   if (scenes !== undefined && !(Number.isInteger(scenes) && scenes >= 2 && scenes <= 16)) throw new Error('--scenes must be a whole number from 2 to 16');
@@ -48,7 +50,7 @@ async function writeCommand(argv: string[]): Promise<void> {
     if (!earlier.success) throw new Error(`--avoid: ${file} is not an explainer script`);
     avoid.push(sceneKinds(earlier.data));
   }
-  const { explainer, attempts } = await writeExplainer(provider, brief, { facts, scenes, avoid, language: option(argv, '--language'), voice: option(argv, '--voice'), media: option(argv, '--media')?.split(',').map(item => item.trim()).filter(Boolean), images: argv.includes('--images'), onProgress: message => console.log(message) });
+  const { explainer, attempts } = await writeExplainer(provider, brief, { facts, scenes, avoid, language: option(argv, '--language'), voice: option(argv, '--voice'), media: option(argv, '--media')?.split(',').map(item => item.trim()).filter(Boolean), images: argv.includes('--images'), stock: argv.includes('--stock'), onProgress: message => console.log(message) });
   const output = resolve(option(argv, '--output') ?? 'explainer.json');
   await writeFile(output, `${JSON.stringify(explainer, null, 2)}\n`);
   console.log(`Wrote ${output} (${explainer.scenes.length} scenes${attempts > 1 ? `, after ${attempts} attempts` : ''})\nNext: mr explainer compile ${relative(process.cwd(), output)}`);
@@ -110,6 +112,8 @@ export type BuildExplainerOptions = {
   /** Where composition.json goes; pictures and voices go to an assets folder beside it. */ output: string;
   /** Record each spoken line (default true). Without it scenes last as long as their pictures need. */ voice?: boolean;
   voiceName?: string;
+  /** The keys for media scenes that ask for stock footage (default: PEXELS_API_KEY and PIXABAY_API_KEY; Pexels is used when both are set). */ pexelsKey?: string; pixabayKey?: string;
+  /** Where Pexels lives and how to fetch from it; tests point these at a stand-in. */ stock?: Partial<StockOptions>;
   /** Which AI provider draws pictures and runs a non-Edge voice; only used when the script needs one. */ provider?: { provider?: string; model?: string; baseUrl?: string };
   /** Draw the scene kinds that have a React drawing (compare, chart, flow, grid) with React components, so layouts follow the content. Writes explainer-react.tsx beside composition.json. */ react?: boolean;
   log?: (message: string) => void;
@@ -119,6 +123,12 @@ export type BuildExplainerOptions = {
 export async function buildExplainer(script: Explainer, options: BuildExplainerOptions): Promise<{ output: string; notes: string[]; scenes: number; spoken: number; pictures: { made: number; reused: number }; react: boolean }> {
   const log = options.log ?? (() => {}), output = resolve(options.output), dir = dirname(output), assets = join(dir, 'assets');
   let spec = script, pictures = { made: 0, reused: 0 };
+  if (needsStock(spec)) {
+    const got = await fetchExplainerStock(spec, { dir, pexelsKey: options.pexelsKey, pixabayKey: options.pixabayKey, stock: options.stock, onProgress: log });
+    spec = got.spec;
+    log(`stock footage: ${got.found} found, ${got.reused} reused${got.limitLeft !== undefined ? `; Pexels has ${got.limitLeft} requests left for this key` : ''}`);
+    if (got.limitLeft !== undefined && got.limitLeft < 50) log('Pexels: fewer than 50 requests left (the limit is 200 an hour and 20,000 a month)');
+  }
   if (needsImages(spec)) {
     const drawn = await generateExplainerImages(spec, createProvider(options.provider ?? {}), { dir, onProgress: log });
     spec = drawn.spec; pictures = { made: drawn.made, reused: drawn.reused };

@@ -23,6 +23,8 @@ export function StockSearchPanel({ projectId, assets, reload, setNote, onAdded }
   const { status, error: statusError } = useStockStatus();
   const [provider, setProvider] = useState('');
   const [kind, setKind] = useState<Kind>('photo');
+  const [shape, setShape] = useState('');
+  const [minSize, setMinSize] = useState('');
   const [query, setQuery] = useState('');
   const [searched, setSearched] = useState('');
   const [found, setFound] = useState<StockResult[] | null>(null);
@@ -47,10 +49,10 @@ export function StockSearchPanel({ projectId, assets, reload, setNote, onAdded }
   const active = connected.some(item => item.id === provider) ? provider : connected[0]!.id;
   const site = SITES[active]!;
 
-  const run = async (next: { provider: string; kind: Kind; q: string; page: number }) => {
+  const run = async (next: { provider: string; kind: Kind; q: string; page: number; shape?: string; size?: string }) => {
     setLoading(true); setProblem('');
     try {
-      const reply = await api<StockSearch>(`/api/stock/search?provider=${next.provider}&kind=${next.kind}&q=${encodeURIComponent(next.q)}&page=${next.page}`);
+      const reply = await api<StockSearch>(`/api/stock/search?provider=${next.provider}&kind=${next.kind}&q=${encodeURIComponent(next.q)}&page=${next.page}${(next.provider === 'pexels' || next.kind === 'photo') && (next.shape ?? shape) ? `&orientation=${next.shape ?? shape}` : ''}${next.provider === 'pexels' && (next.size ?? minSize) ? `&size=${next.size ?? minSize}` : ''}`);
       setFound(current => (next.page > 1 && current ? [...current, ...reply.results] : reply.results));
       setMore(reply.hasMore); setPage(next.page); setSearched(next.q);
     } catch (cause) {
@@ -61,9 +63,9 @@ export function StockSearchPanel({ projectId, assets, reload, setNote, onAdded }
     }
   };
   const submit = (event: { preventDefault(): void }) => { event.preventDefault(); if (query.trim().length >= 2) void run({ provider: active, kind, q: query.trim(), page: 1 }); };
-  const switchTo = (change: { provider?: string; kind?: Kind }) => {
-    const next = { provider: change.provider ?? active, kind: change.kind ?? kind };
-    setProvider(next.provider); setKind(next.kind); setFound(null); setMore(false);
+  const switchTo = (change: { provider?: string; kind?: Kind; shape?: string; size?: string }) => {
+    const next = { provider: change.provider ?? active, kind: change.kind ?? kind, shape: change.shape ?? shape, size: change.size ?? minSize };
+    setProvider(next.provider); setKind(next.kind); setShape(next.shape); setMinSize(next.size); setFound(null); setMore(false);
     if (searched) void run({ ...next, q: searched, page: 1 });
   };
 
@@ -105,6 +107,12 @@ export function StockSearchPanel({ projectId, assets, reload, setNote, onAdded }
           </div>
         ) : null}
       </div>
+      {active === 'pexels' || kind === 'photo' ? (
+        <div className="stock-filters">
+          <label className="stock-select">Shape <select aria-label="Shape" value={shape} onChange={event => switchTo({ shape: event.target.value })}><option value="">Any</option><option value="portrait">Portrait (vertical video)</option><option value="landscape">Landscape</option>{active === 'pexels' ? <option value="square">Square</option> : null}</select></label>
+          {active === 'pexels' ? <label className="stock-select">Size <select aria-label="Smallest size" value={minSize} onChange={event => switchTo({ size: event.target.value })}><option value="">Any</option><option value="small">{kind === 'photo' ? '4 MP or more' : 'HD or more'}</option><option value="medium">{kind === 'photo' ? '12 MP or more' : 'Full HD or more'}</option><option value="large">{kind === 'photo' ? '24 MP or more' : '4K'}</option></select></label> : null}
+        </div>
+      ) : null}
       {connected.length < status.providers.length ? <p className="stock-hint">Another library can be connected in <a href="#/settings">Settings</a>.</p> : null}
       {problem ? <Notice tone="error" title="Search did not work">{problem}</Notice> : null}
 

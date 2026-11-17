@@ -13,7 +13,12 @@ export type StockResult = {
   /** The file to download, and its extension. */
   file: string; ext: string;
 };
-export type StockPage = { results: StockResult[]; page: number; hasMore: boolean; total?: number };
+/** How Pexels shapes a search. Pixabay's searches ignore these. */
+export type StockOrientation = 'landscape' | 'portrait' | 'square';
+export type StockSize = 'small' | 'medium' | 'large';
+export const STOCK_ORIENTATIONS: readonly StockOrientation[] = ['landscape', 'portrait', 'square'];
+export const STOCK_SIZES: readonly StockSize[] = ['small', 'medium', 'large'];
+export type StockPage = { results: StockResult[]; page: number; hasMore: boolean; total?: number; /** Pexels: how many requests the key has left in its period (from the X-Ratelimit-Remaining header). */ limitLeft?: number };
 export type StockOptions = {
   /** Where each library's API lives (tests point these at a stand-in). */
   bases: Record<StockProviderId, string>;
@@ -86,12 +91,14 @@ function pixabayVideo(hit: any): StockResult | undefined {
 const cache = new Map<string, { at: number; page: StockPage }>();
 const TTL: Record<StockProviderId, number> = { pexels: 15 * 60_000, pixabay: 24 * 60 * 60_000 };
 
-export type StockQuery = { q: string; kind: StockKind; page: number; perPage?: number };
+export type StockQuery = { q: string; kind: StockKind; page: number; perPage?: number; /** The shape wanted: portrait for a vertical video, landscape for a wide one. Pexels takes it for photos and video; Pixabay for photos only (its video search has no shape, so ask for many and choose). */ orientation?: StockOrientation; /** Pexels: the smallest size wanted (photos: small 4 MP, medium 12 MP, large 24 MP; video: small HD, medium Full HD, large 4K). */ size?: StockSize };
 
 /** Searches one library with a person's key. Throws a message fit to show when the key is refused, the limit is reached, or the library is down. */
 export async function searchStock(provider: StockProviderId, apiKey: string, query: StockQuery, options: StockOptions = defaultStockOptions, fresh = false): Promise<StockPage> {
   const label = STOCK_LABELS[provider], perPage = query.perPage ?? 24;
-  const cacheKey = `${provider}|${query.kind}|${query.page}|${perPage}|${query.q.toLowerCase()}`;
+  // Pixabay's photo search takes a shape but no size, and its video search takes neither: what a search does not take is not part of its cache key.
+  const orientation = provider === 'pexels' || query.kind === 'photo' ? query.orientation : undefined, size = provider === 'pexels' ? query.size : undefined;
+  const cacheKey = `${provider}|${query.kind}|${query.page}|${perPage}|${orientation ?? ''}|${size ?? ''}|${query.q.toLowerCase()}`;
   const hit = cache.get(cacheKey);
   if (!fresh && hit && Date.now() - hit.at < TTL[provider]) return hit.page;
 
@@ -99,11 +106,16 @@ export async function searchStock(provider: StockProviderId, apiKey: string, que
   let url: string, init: RequestInit = { signal: AbortSignal.timeout(15_000) };
   if (provider === 'pexels') {
     params.set('query', query.q); params.set('per_page', String(perPage)); params.set('page', String(query.page));
+    if (orientation) params.set('orientation', orientation);
+    if (size) params.set('size', size);
     url = `${options.bases.pexels}${query.kind === 'photo' ? '/v1/search' : '/v1/videos/search'}?${params}`;
     init = { ...init, headers: { Authorization: apiKey } };
   } else {
     params.set('key', apiKey); params.set('q', query.q); params.set('per_page', String(Math.max(3, perPage))); params.set('page', String(query.page)); params.set('safesearch', 'true');
-    if (query.kind === 'photo') params.set('image_type', 'photo');
+    if (query.kind === 'photo') {
+      params.set('image_type', 'photo');
+      if (orientation === 'portrait') params.set('orientation', 'vertical'); else if (orientation === 'landscape') params.set('orientation', 'horizontal');
+    }
     url = `${options.bases.pixabay}${query.kind === 'photo' ? '/api/' : '/api/videos/'}?${params}`;
   }
 
@@ -119,7 +131,9 @@ export async function searchStock(provider: StockProviderId, apiKey: string, que
   const results = hits.flatMap(item => { const one = normalise(item); return one ? [one] : []; });
   const total = num(provider === 'pexels' ? body.total_results : body.totalHits) || undefined;
   const hasMore = provider === 'pexels' ? Boolean(body.next_page) : (total !== undefined && query.page * perPage < total);
-  const page: StockPage = { results, page: query.page, hasMore, ...(total !== undefined ? { total } : {}) };
+  // Pexels reports the key's remaining requests on every successful answer.
+  const left = Number(response.headers.get('x-ratelimit-remaining'));
+  const page: StockPage = { results, page: query.page, hasMore, ...(total !== undefined ? { total } : {}), ...(provider === 'pexels' && response.headers.has('x-ratelimit-remaining') && Number.isFinite(left) ? { limitLeft: left } : {}) };
   cache.set(cacheKey, { at: Date.now(), page });
   if (cache.size > 300) cache.delete(cache.keys().next().value!);
   return page;

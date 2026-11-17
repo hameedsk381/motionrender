@@ -90,7 +90,9 @@ export const explainerSceneSchema = z.discriminatedUnion('kind', [
     tone: z.enum(['mixed', 'gold', 'mint', 'red']).default('mixed').describe('Colour of the pieces'),
     caption: words(120).optional().describe('One sentence at the bottom of the screen') }),
   z.object({ kind: z.literal('media'), ...common,
-    src: words(200).optional().describe('A picture or video file of the project, relative to the video (such as assets/city.mp4); it fills a rounded frame on the board. Give this or prompt, not both'),
+    src: words(200).optional().describe('A picture or video file of the project, relative to the video (such as assets/city.mp4); it fills a rounded frame on the board. Give one of src, prompt or stock'),
+    stock: words(120).optional().describe('Instead of a file or a prompt: what to find on Pixabay or Pexels, as two to four plain search words such as "ocean waves at dusk". The footage is found and downloaded when the video is built (it needs a free key: PIXABAY_API_KEY, or PEXELS_API_KEY if you have one), in the shape the video needs, and credited in the corner. Give one of src, prompt or stock'),
+    stockKind: z.enum(['photo', 'video']).optional().describe('With stock: a photo (the default) or a video'),
     prompt: words(400).optional().describe('Instead of a file: what to draw, as a plain description of one clear picture without words or logos. The picture is made with the image model when the video is built, and needs one'),
     title: words(60).optional().describe('Large text over the lower part of the picture, such as the name of a place or idea'),
     caption: words(120).optional().describe('One sentence under the title'),
@@ -177,7 +179,7 @@ export const explainerSchema = z.object({
   voiceRate: z.number().int().min(-40).max(60).optional().describe('How much faster (+) or slower (-) the voice speaks, in percent: +15 suits a lively promo'),
   sources: z.array(z.object({ text: z.string().max(1000), source: z.string().max(200), url: z.string().max(500), date: z.string().max(20) })).max(30).default([]).describe('The facts the script was written from, with where each came from and when. They are not drawn; they stay with the script so its numbers can be checked.'),
   scenes: z.array(explainerSceneSchema).min(1).max(24).superRefine((scenes, ctx) => {
-    scenes.forEach((scene, i) => { if (scene.kind === 'media' && (scene.src === undefined) === (scene.prompt === undefined)) ctx.addIssue({ code: 'custom', path: [i, 'src'], message: 'A media scene needs exactly one of "src" (a file) or "prompt" (a picture to draw)' }); });
+    scenes.forEach((scene, i) => { if (scene.kind === 'media' && [scene.src, scene.prompt, scene.stock].filter(value => value !== undefined).length !== 1) ctx.addIssue({ code: 'custom', path: [i, 'src'], message: 'A media scene needs exactly one of "src" (a file), "prompt" (a picture to draw) or "stock" (footage to find on Pixabay or Pexels)' }); });
   }),
 });
 

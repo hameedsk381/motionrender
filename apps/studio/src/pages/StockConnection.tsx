@@ -49,7 +49,7 @@ export function StockConnectionCard() {
             <div className="stock-key-head">
               <b>{item.label}</b>
               {item.connected ? <Badge tone="green">Connected {item.keyHint}</Badge> : <Badge tone="amber">Not connected</Badge>}
-              <a href={item.keyUrl} target="_blank" rel="noreferrer noopener">Get a free key</a>
+              {item.id === 'pexels' ? <span className="sub">Pexels is not giving out new keys at the moment; paste yours if you have one.</span> : <a href={item.keyUrl} target="_blank" rel="noreferrer noopener">Get a free key</a>}
             </div>
             <Field label={item.connected ? 'Replace the key' : 'API key'}>
               <input className="input" type="password" autoComplete="off" value={keys[item.id] ?? ''} placeholder={item.connected ? 'Paste a new key to replace it' : `Paste your ${item.label} key`} onChange={event => setKeys(current => ({ ...current, [item.id]: event.target.value }))} />

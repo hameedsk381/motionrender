@@ -34,7 +34,7 @@ Never say a video is done before you have looked at the contact sheet. The singl
 
 ## Facts, pictures, voices
 - Numbers must be real, never from memory. Look them up (no key needed): \`mr facts country India,Brazil internet_users\`, \`mr facts wikipedia "Load balancing"\`, \`mr facts exchange USD INR\` (\`mr facts indicators\` lists the figures; add \`--json\`), or the \`motionrender_facts\` tool. Every fact has a source and date: put it in the scene's note or caption and in the script's \`sources\`. If a lookup fails, say so and leave the number out; do not guess.
-- A media scene takes a file from the project (\`assets/...\`) or a \`prompt\` (needs an image model: \`--images\`). Stock photos: the studio's Media tab.
+- A media scene takes a file from the project (\`assets/...\`) a \`prompt\` (needs an image model: \`--images\`), or \`stock\` search words (\`stockKind\`: photo or video), which finds real footage on Pixabay or Pexels when the video is built, in the video's shape, and credits it: it needs a free key in PIXABAY_API_KEY (or PEXELS_API_KEY; Pexels is not giving out new keys at present). The choice is kept in assets/, with assets/credits.json listing every credit. The studio's Media tab searches too.
 - Voices: the free Edge voices, which need internet but no key: \`en-IN-NeerjaNeural\`, \`en-US-AriaNeural\`, \`hi-IN-SwaraNeural\`, \`te-IN-ShrutiNeural\` (set \`voice\` in the script; \`voiceRate\` speeds it up or slows it down, +12 suits a promo). \`--no-voice\` builds silently.
 
 ## Tools (MCP)

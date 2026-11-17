@@ -15,6 +15,8 @@ export type WriteExplainerOptions = {
   language?: string;
   /** Picture and video files the video has (such as assets/city.mp4). Only these can appear, in media scenes; with none, there are no media scenes. */
   media?: string[];
+  /** The video may use stock footage: media scenes may give `stock` (search words) to be found on Pixabay or Pexels at build time (at most two). */
+  stock?: boolean;
   /** The provider can draw pictures: media scenes may then give a prompt to draw instead of a file (at most two). */
   images?: boolean;
   /** Checked facts with their sources (see researchFacts). Every number and claim the script states as fact must come from these. */
@@ -58,6 +60,7 @@ const designGuide = [
 ].join('\n');
 
 const imageGuide = '- media (drawn): a picture made by an image model fills a frame on the board. {kind:"media", prompt:"<one clear picture described plainly: subject, setting, style; no words, letters or logos>", title?:"large text", caption?, say}. Use at most two, and only where a picture shows the idea better than a diagram.';
+const stockGuide = '- media (stock): real footage or a photo from Pixabay or Pexels, found when the video is built, in the shape the video needs and credited for you. {kind:"media", stock:"<two to four plain search words, concrete and visual>", stockKind?:"photo"|"video", title?:"large text", caption?, say}. Use at most two, and only where real footage of a place or thing helps; the words must name something a camera could film.';
 const mediaGuide = (files: string[]) => `- media: a picture or video of the project fills a frame on the board. {kind:"media", src:"<one of the files below>", title?:"large text", caption?, credit?, say}\nAvailable media files (the only pictures and footage the video has; use each at most once): ${files.join(', ')}`;
 
 const factsBlock = (facts: Fact[]) => `Facts you may use, each with its source and date. State no number, date or claim as fact unless it is here, and name the source in the scene's note (stat) or caption (chart), such as "World Bank, 2025":\n${facts.map((fact, i) => `[${i + 1}] ${fact.text} (${fact.source}${fact.date ? `, ${fact.date}` : ''})`).join('\n')}`;
@@ -97,7 +100,7 @@ export function explainerPrompt(brief: string, options: WriteExplainerOptions = 
     `Reply with one JSON object and nothing else: {"version":"1.0","topic":"SHORT UPPER CASE TOPIC","treatment":{...},"look":"...","scenes":[...]}${options.voice ? `, and "voice":"${options.voice}"` : ''}.`,
     treatmentGuide,
     ...(options.avoid?.length ? [`Videos already made used these scene sequences; yours must not repeat one:\n${options.avoid.map(kinds => `- ${kinds.join(' > ')}`).join('\n')}`] : []),
-    [GUIDE, ...(options.media?.length ? [mediaGuide(options.media)] : []), ...(options.images ? [imageGuide] : [])].join('\n'),
+    [GUIDE, ...(options.media?.length ? [mediaGuide(options.media)] : []), ...(options.images ? [imageGuide] : []), ...(options.stock ? [stockGuide] : [])].join('\n'),
     designGuide,
     ...(options.facts?.length ? [factsBlock(options.facts)] : []),
     'Rules:',
