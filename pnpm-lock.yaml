@@ -418,6 +418,9 @@ importers:
       '@ove/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@ove/ffmpeg':
+        specifier: workspace:*
+        version: link:../../packages/ffmpeg
       '@ove/jobs':
         specifier: workspace:*
         version: link:../../packages/jobs

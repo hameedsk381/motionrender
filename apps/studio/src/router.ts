@@ -7,7 +7,8 @@ export type Route =
   | { name: 'reset' | 'verify'; token: string }
   | { name: 'making'; id: string; job: string }
   | { name: 'editor'; id: string; tab: string }
-  | { name: 'production'; id: string; section: string };
+  | { name: 'production'; id: string; section: string }
+  | { name: 'semantic-plan'; id: string };
 
 const read = () => location.hash;
 const subscribe = (fn: () => void) => { window.addEventListener('hashchange', fn); return () => window.removeEventListener('hashchange', fn); };
@@ -28,6 +29,7 @@ export function parse(hash: string): Route {
   if (parts[0] === 'settings') return { name: 'settings' };
   if (parts[0] === 'making' && parts[1]) return { name: 'making', id: parts[1], job: parts[2] ?? '' };
   if (parts[0] === 'p' && parts[1] && parts[2] === 'plan') return { name: 'production', id: parts[1], section: parts[3] ?? 'brief' };
+  if (parts[0] === 'p' && parts[1] && parts[2] === 'semantic') return { name: 'semantic-plan', id: parts[1] };
   if (parts[0] === 'p' && parts[1]) return { name: 'editor', id: parts[1], tab: parts[2] ?? 'edit' };
   if (parts.length === 0) return { name: 'home' };
   return { name: 'notfound', path: `/${parts.join('/')}` };
@@ -39,6 +41,7 @@ export const useRoute = (): Route => {
 export const go = (path: string) => { location.hash = path; };
 export const editorPath = (id: string, tab?: string) => `#/p/${encodeURIComponent(id)}${tab ? '/' + tab : ''}`;
 export const planPath = (id: string, section = 'brief') => `#/p/${encodeURIComponent(id)}/plan/${section}`;
+export const semanticPlanPath = (id: string) => `#/p/${encodeURIComponent(id)}/semantic`;
 export const discoverPath = '#/discover';
 export const playgroundPath = '#/playground';
 export const generationPath = '#/generation';

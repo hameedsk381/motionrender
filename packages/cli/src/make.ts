@@ -1,16 +1,16 @@
 // `mr make`: the whole check-and-build loop in one call, for agents and people who would otherwise run validate, compile, still, review and
-// render one after another. It reads either an explainer script or a composition, validates it, builds it, runs the design review and writes
+// render one after another. It reads an explainer script, semantic video plan, or composition, validates it, builds it, runs the design review and writes
 // one contact sheet of the whole video, and (only when asked) renders it, as a quick draft or at full quality. Every problem comes back in one
 // report with where it is, so one fix and one more call is the usual loop.
 import { readFile, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
-import { explainerSchema, type Explainer } from '@ove/schema';
-import { defaultConcurrency, loadComposition, renderMedia, reviewComposition, type Composition, type ReviewIssue } from '@ove/core';
+import { dirname, extname, join, resolve } from 'node:path';
+import { explainerSchema, videoPlanSchema, type Explainer } from '@ove/schema';
+import { compileVideoPlan, defaultConcurrency, loadComposition, parseVideoMarkdown, proposePlanRepairs, renderMedia, reviewComposition, reviewRepairTasks, type Composition, type PlanRepairProposal, type ReviewIssue, type ReviewRepairTask } from '@ove/core';
 import { buildExplainer } from './explainer';
 
 export type MakeRender = 'draft' | 'final';
 export type MakeOptions = {
-  /** An explainer script or a composition. */ file: string;
+  /** An explainer script, semantic video plan, or composition. */ file: string;
   /** Render an MP4 after the checks: a quick draft (half size, fast encode) or the full-quality video. Default: no render. */ render?: MakeRender;
   /** The video file (default: draft.mp4 or out.mp4 beside the input). */ output?: string;
   /** Contact sheet path (default: review.png beside the input). */ sheet?: string;
@@ -23,11 +23,11 @@ export type MakeOptions = {
 };
 export type MakeResult = {
   ok: boolean;
-  kind: 'explainer' | 'composition';
+  kind: 'explainer' | 'video-plan' | 'composition';
   /** Problems that stopped the build, with their paths. Empty when the file was built. */ problems: string[];
   composition?: string;
   summary?: { scenes: number; seconds: number; width: number; height: number; fps: number; spoken?: number };
-  review?: { sheet: string; sheetFrames: number[]; errors: ReviewIssue[]; warnings: ReviewIssue[]; notes: ReviewIssue[]; loudness?: { integrated: number; truePeak: number } };
+  review?: { sheet: string; sheetFrames: number[]; errors: ReviewIssue[]; warnings: ReviewIssue[]; notes: ReviewIssue[]; repairs: ReviewRepairTask[]; planRepairs?: PlanRepairProposal[]; loudness?: { integrated: number; truePeak: number } };
   video?: { output: string; draft: boolean; seconds: number; frames: number; renderSeconds: number };
   notes: string[];
   timings: Record<string, number>;
@@ -38,8 +38,8 @@ const hasCodeLayers = (composition: Composition) => composition.scenes.some(scen
 const readJson = async (file: string) => JSON.parse((await readFile(file, 'utf8')).replace(/^﻿/, ''));
 const seconds = (since: number) => Math.round((Date.now() - since) / 100) / 10;
 
-/** An explainer script has a `topic` (the example script from `explainer example` carries a `version` too); a composition has a `version` and no `topic`. */
-export const kindOfFile = (raw: any): 'explainer' | 'composition' => (raw && typeof raw === 'object' && 'version' in raw && !('topic' in raw) ? 'composition' : 'explainer');
+/** A video plan declares kind: video-plan; an explainer has topic; a composition has version and no topic. */
+export const kindOfFile = (raw: any): 'explainer' | 'video-plan' | 'composition' => raw?.kind === 'video-plan' ? 'video-plan' : (raw && typeof raw === 'object' && 'version' in raw && !('topic' in raw) ? 'composition' : 'explainer');
 
 /** What the draft render changes: half the size, a fast encode, no motion blur. It is for checking how the video moves, not for sending. */
 export const draftSettings = { scale: 0.5, preset: 'ultrafast' as const, crf: 32, motionBlur: false };
@@ -47,11 +47,11 @@ export const draftSettings = { scale: 0.5, preset: 'ultrafast' as const, crf: 32
 export async function makeVideo(options: MakeOptions): Promise<MakeResult> {
   const log = options.log ?? (() => {}), file = resolve(options.file), dir = dirname(file), timings: Record<string, number> = {}, notes: string[] = [];
   let started = Date.now();
-  const raw = await readJson(file), kind = kindOfFile(raw);
+  const raw = extname(file).toLowerCase() === '.md' ? parseVideoMarkdown((await readFile(file, 'utf8')).replace(/^﻿/, '')) : await readJson(file), kind = kindOfFile(raw);
   const fail = (problems: string[]): MakeResult => ({ ok: false, kind, problems, notes, timings, next: ['Fix the problems listed and run make again.'] });
 
   // 1. Check and build.
-  let compositionPath = file, composition: Composition, spoken: number | undefined, reacted = false, scriptScenes: number | undefined;
+  let compositionPath = file, composition: Composition, plan: any, spoken: number | undefined, reacted = false, scriptScenes: number | undefined;
   if (kind === 'explainer') {
     const parsed = explainerSchema.safeParse(raw);
     if (!parsed.success) return fail(parsed.error.issues.map(issue => `${issue.path.join('.') || 'script'}: ${issue.message}`));
@@ -61,6 +61,16 @@ export async function makeVideo(options: MakeOptions): Promise<MakeResult> {
     catch (error) { return fail([(error as Error).message]); }
     compositionPath = built.output; spoken = built.spoken; reacted = built.react; scriptScenes = built.scenes; notes.push(...built.notes);
     composition = loadComposition(await readJson(compositionPath));
+  } else if (kind === 'video-plan') {
+    const parsed = videoPlanSchema.safeParse(raw);
+    if (!parsed.success) return fail(parsed.error.issues.map(issue => `${issue.path.join('.') || 'plan'}: ${issue.message}`));
+    log('Compiling the semantic video plan…');
+    plan = parsed.data; const built = compileVideoPlan(parsed.data);
+    compositionPath = join(dir, 'composition.json');
+    await writeFile(compositionPath, JSON.stringify(built.composition, null, 2) + '\n');
+    notes.push(...built.notes);
+    spoken = parsed.data.beats.filter(beat => beat.narration).length;
+    composition = loadComposition(built.composition);
   } else {
     try { composition = loadComposition(raw); }
     catch (error) { return fail([(error as Error).message]); }
@@ -78,7 +88,7 @@ export async function makeVideo(options: MakeOptions): Promise<MakeResult> {
   await writeFile(sheet, reviewed.sheet);
   timings.review = seconds(started);
   const bySeverity = (severity: ReviewIssue['severity']) => reviewed.issues.filter(issue => issue.severity === severity);
-  const review = { sheet, sheetFrames: reviewed.sheetFrames, errors: bySeverity('error'), warnings: bySeverity('warning'), notes: bySeverity('info'), loudness: reviewed.loudness };
+  const review = { sheet, sheetFrames: reviewed.sheetFrames, errors: bySeverity('error'), warnings: bySeverity('warning'), notes: bySeverity('info'), repairs: reviewRepairTasks(composition, reviewed.issues), ...(plan ? { planRepairs: proposePlanRepairs(plan, reviewed.issues) } : {}), loudness: reviewed.loudness };
   const clean = review.errors.length === 0;
 
   // 3. Render, only when asked, and not over unresolved errors.
@@ -94,7 +104,7 @@ export async function makeVideo(options: MakeOptions): Promise<MakeResult> {
 
   const rel = (path: string) => path;
   const next: string[] = [];
-  if (!clean) next.push('Fix the review errors (see "errors"), then run make again.');
+  if (!clean) next.push('Fix the review errors using the targeted repair tasks, then run make again.');
   else if (!video) next.push(`Look at the contact sheet (${rel(sheet)}) to check the whole video, then run make again with render "draft" to see it move, or "final" for the finished video.`);
   else if (video.draft) next.push('If the draft moves the way you want, run make again with render "final".');
   return { ok: clean, kind, problems: [], composition: compositionPath, summary, review, video, notes, timings, next };
@@ -116,6 +126,15 @@ export function makeReport(result: MakeResult): string {
   for (const issue of r.warnings.slice(0, 8)) lines.push(show(issue, 'warn '));
   if (r.warnings.length > 8) lines.push(`  …and ${r.warnings.length - 8} more warnings`);
   for (const note of result.notes) lines.push(`Note: ${note}`);
+  if (r.repairs.length) {
+    lines.push(`Repairs: ${r.repairs.length} actionable task${r.repairs.length === 1 ? '' : 's'}.`);
+    for (const task of r.repairs.slice(0, 6)) lines.push(`  ${task.id}${task.target.beatId ? ` [beat ${task.target.beatId}]` : task.target.sceneId ? ` [scene ${task.target.sceneId}]` : ''}: ${task.instruction}`);
+    if (r.repairs.length > 6) lines.push(`  …and ${r.repairs.length - 6} more repair tasks`);
+  }
+  if (r.planRepairs?.length) {
+    const proposed = r.planRepairs.filter(repair => repair.edits.length);
+    if (proposed.length) lines.push(`Semantic proposals: ${proposed.length}; inspect their edits, then use mr plan edit rather than changing generated layers.`, ...proposed.slice(0, 4).map(repair => `  ${repair.id}${repair.beatId ? ` [beat ${repair.beatId}]` : ''}: ${repair.rationale}`));
+  }
   if (result.video) lines.push(`${result.video.draft ? 'Draft video' : 'Video'}: ${result.video.output} (${result.video.seconds.toFixed(1)} s, rendered in ${result.video.renderSeconds} s)`);
   lines.push(`Time: ${Object.entries(result.timings).map(([step, took]) => `${step} ${took} s`).join(', ')}`);
   lines.push('', ...result.next);

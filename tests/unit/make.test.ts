@@ -14,6 +14,7 @@ describe('make', () => {
   it('tells a composition from an explainer script', () => {
     expect(kindOfFile({ version: '1.0', scenes: [] })).toBe('composition');
     expect(kindOfFile({ topic: 'CACHES', scenes: [{ kind: 'title' }] })).toBe('explainer');
+    expect(kindOfFile({ kind: 'video-plan', id: 'launch', beats: [] })).toBe('video-plan');
   });
 
   it('lists every problem in a script at once and stops before building or rendering anything', async () => {
@@ -53,7 +54,7 @@ describe('make', () => {
   it('writes a short report: what was built, what is wrong, where the files are, what to do next', () => {
     const text = makeReport({
       ok: false, kind: 'explainer', problems: [], composition: '/p/composition.json', summary: { scenes: 5, seconds: 31.2, width: 1080, height: 1920, fps: 30, spoken: 5 },
-      review: { sheet: '/p/review.png', sheetFrames: [0, 30], errors: [{ severity: 'error', code: 'off-frame', message: 'text runs off the frame', frame: 120, layer: 'title' } as any], warnings: [], notes: [] },
+      review: { sheet: '/p/review.png', sheetFrames: [0, 30], errors: [{ severity: 'error', code: 'off-frame', message: 'text runs off the frame', frame: 120, layer: 'title' } as any], warnings: [], notes: [], repairs: [] },
       notes: [], timings: { build: 1.2, review: 14 }, next: ['Fix the review errors (see "errors"), then run make again.'],
     });
     expect(text).toContain('Built, with errors: /p/composition.json (5 scenes, 31.2 s, 1080x1920, 5 spoken lines)');

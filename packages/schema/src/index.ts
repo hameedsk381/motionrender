@@ -1,5 +1,5 @@
 import { z } from 'zod'; import { colorPattern, variablesSchema, componentsSchema, resolveVariables, substituteVariables } from './variables'; import { captionCueSchema } from './captions'; import { textureTypes } from './design'; import { contentSchema } from './content'; import { fontWeight, fontStyle, assetSchema, assetLinkProblems } from './assets';
-export * from './variables'; export * from './captions'; export * from './design'; export * from './content'; export * from './assets'; export * from './production'; export * from './explainer'; export * from './explainer-looks'; export * from './explainer-examples';
+export * from './variables'; export * from './captions'; export * from './design'; export * from './content'; export * from './assets'; export * from './production'; export * from './explainer'; export * from './explainer-looks'; export * from './explainer-examples'; export * from './plan';
 
 const color = z.string().regex(colorPattern);
 // Kept in step with easingNames in @ove/animation (a unit test checks they match).
@@ -302,3 +302,4 @@ export function loadComposition(input: unknown, values: Record<string, unknown> 
 export const compositionJsonSchema = z.toJSONSchema(compositionSchema, { target: 'draft-2020-12', io: 'input' });
 // Readable text for any error, used by the CLI and the preview: validation problems become one "✖ message → at path" line each.
 export const describeError = (error: unknown): string => error instanceof z.ZodError ? z.prettifyError(error) : error instanceof Error ? error.message : String(error);
+export { sceneInputSchema, sceneInputJsonSchema, type SceneInput } from './scene-input';

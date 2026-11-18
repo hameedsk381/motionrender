@@ -1,0 +1,246 @@
+{
+  "version": "1.0",
+  "id": "support-launch",
+  "name": "Support, without the ticket maze",
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "durationFrames": 450,
+  "variables": {
+    "customer": {
+      "type": "string",
+      "default": "Acme"
+    }
+  },
+  "components": {},
+  "assets": [],
+  "scenes": [
+    {
+      "id": "problem",
+      "name": "Name the fragmented support workflow.",
+      "startFrame": 0,
+      "durationFrames": 120,
+      "metadata": {
+        "sceneId": "problem",
+        "action": "Restrained editorial text-card treatment.",
+        "camera": {
+          "shotSize": "medium",
+          "angle": "eye-level",
+          "movement": "static"
+        },
+        "characterIds": [],
+        "propIds": []
+      },
+      "beat": "problem",
+      "layers": [
+        {
+          "id": "problem-card",
+          "type": "text",
+          "blur": 0,
+          "blendMode": "normal",
+          "startFrame": 0,
+          "endFrame": 120,
+          "x": 540,
+          "y": 924.6,
+          "width": 864,
+          "opacity": 1,
+          "rotation": 0,
+          "scale": 1,
+          "scaleX": 1,
+          "scaleY": 1,
+          "originX": 0,
+          "originY": 0,
+          "zIndex": 0,
+          "visible": true,
+          "fixed": false,
+          "animations": [],
+          "content": "Support should not live in six tabs.",
+          "fontSize": 59,
+          "fontFamily": "Inter",
+          "fontWeight": 600,
+          "fontStyle": "normal",
+          "letterSpacing": 0,
+          "lineHeight": 1.15,
+          "color": "#f4f1ea",
+          "strokeWidth": 1,
+          "lineCap": "butt",
+          "lineJoin": "round",
+          "textAlign": "center",
+          "highlight": 1,
+          "maxWidth": 864
+        }
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "solution",
+      "name": "Reveal one calm shared workspace.",
+      "startFrame": 120,
+      "durationFrames": 180,
+      "metadata": {
+        "sceneId": "solution",
+        "action": "Replace this card with the product proof when a dashboard asset is available.",
+        "camera": {
+          "shotSize": "medium",
+          "angle": "eye-level",
+          "movement": "static"
+        },
+        "characterIds": [],
+        "propIds": []
+      },
+      "beat": "solution",
+      "transitionIn": {
+        "type": "fade",
+        "durationFrames": 12,
+        "direction": "left",
+        "color": "#000000",
+        "easing": "easeInOut"
+      },
+      "layers": [
+        {
+          "id": "solution-card",
+          "type": "text",
+          "blur": 0,
+          "blendMode": "normal",
+          "startFrame": 0,
+          "endFrame": 180,
+          "x": 540,
+          "y": 924.6,
+          "width": 864,
+          "opacity": 1,
+          "rotation": 0,
+          "scale": 1,
+          "scaleX": 1,
+          "scaleY": 1,
+          "originX": 0,
+          "originY": 0,
+          "zIndex": 0,
+          "visible": true,
+          "fixed": false,
+          "animations": [],
+          "content": "One shared workspace.",
+          "fontSize": 59,
+          "fontFamily": "Inter",
+          "fontWeight": 600,
+          "fontStyle": "normal",
+          "letterSpacing": 0,
+          "lineHeight": 1.15,
+          "color": "#f4f1ea",
+          "strokeWidth": 1,
+          "lineCap": "butt",
+          "lineJoin": "round",
+          "textAlign": "center",
+          "highlight": 1,
+          "maxWidth": 864
+        }
+      ],
+      "assetIds": []
+    },
+    {
+      "id": "outcome",
+      "name": "Land the customer outcome.",
+      "startFrame": 300,
+      "durationFrames": 150,
+      "metadata": {
+        "sceneId": "outcome",
+        "action": "Confident minimal end card.",
+        "camera": {
+          "shotSize": "medium",
+          "angle": "eye-level",
+          "movement": "static"
+        },
+        "characterIds": [],
+        "propIds": []
+      },
+      "beat": "outcome",
+      "transitionIn": {
+        "type": "fade",
+        "durationFrames": 12,
+        "direction": "left",
+        "color": "#000000",
+        "easing": "easeInOut"
+      },
+      "layers": [
+        {
+          "id": "outcome-card",
+          "type": "text",
+          "blur": 0,
+          "blendMode": "normal",
+          "startFrame": 0,
+          "endFrame": 150,
+          "x": 540,
+          "y": 924.6,
+          "width": 864,
+          "opacity": 1,
+          "rotation": 0,
+          "scale": 1,
+          "scaleX": 1,
+          "scaleY": 1,
+          "originX": 0,
+          "originY": 0,
+          "zIndex": 0,
+          "visible": true,
+          "fixed": false,
+          "animations": [],
+          "content": "Faster answers. Better customers.",
+          "fontSize": 59,
+          "fontFamily": "Inter",
+          "fontWeight": 600,
+          "fontStyle": "normal",
+          "letterSpacing": 0,
+          "lineHeight": 1.15,
+          "color": "#f4f1ea",
+          "strokeWidth": 1,
+          "lineCap": "butt",
+          "lineJoin": "round",
+          "textAlign": "center",
+          "highlight": 1,
+          "maxWidth": 864
+        }
+      ],
+      "assetIds": []
+    }
+  ],
+  "background": "#101827",
+  "content": {
+    "audience": "support leaders",
+    "sources": [],
+    "beats": [
+      {
+        "id": "problem",
+        "name": "Name the fragmented support workflow.",
+        "seconds": 4,
+        "narration": "Your support team should not have to work across six different tabs.",
+        "onScreen": "Support should not live in six tabs.",
+        "data": [],
+        "sourceIds": []
+      },
+      {
+        "id": "solution",
+        "name": "Reveal one calm shared workspace.",
+        "seconds": 6,
+        "narration": "Bring messages, customer context, and action into one calm shared workspace.",
+        "onScreen": "One shared workspace.",
+        "data": [],
+        "sourceIds": []
+      },
+      {
+        "id": "outcome",
+        "name": "Land the customer outcome.",
+        "seconds": 5,
+        "narration": "Give every customer a faster answer and every agent a clearer next step.",
+        "onScreen": "Faster answers. Better customers.",
+        "data": [],
+        "sourceIds": []
+      }
+    ]
+  },
+  "grain": 0,
+  "export": {
+    "format": "mp4",
+    "codec": "h264",
+    "transparent": false,
+    "audioVolume": 1,
+    "scale": 1
+  }
+}

@@ -1,6 +1,13 @@
 node_modules/
 .tmp/
 artifacts/
+# Local renders and inspection frames belong in artifacts/, never in the source root.
+/*.mp4
+/*.webm
+/*.mov
+/*.png
+/.studio-smoke/
+/my-video/
 .ove-frames/
 *.tgz
 .env

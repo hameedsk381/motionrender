@@ -50,7 +50,7 @@ describe('the MCP server for agents that write the video themselves', () => {
 
     expect(replies.get(1).result.capabilities).toMatchObject({ tools: {}, resources: {} });
     const names = replies.get(2).result.tools.map((item: any) => item.name);
-    for (const name of ['motionrender_schema', 'motionrender_explainer_kinds', 'motionrender_explainer_validate', 'motionrender_make_video', 'motionrender_explainer_compile', 'motionrender_facts', 'motionrender_environment', 'motionrender_init', 'motionrender_render_still']) expect(names, name).toContain(name);
+    for (const name of ['motionrender_schema', 'motionrender_explainer_kinds', 'motionrender_explainer_validate', 'motionrender_make_video', 'motionrender_explainer_compile', 'motionrender_plan_validate', 'motionrender_plan_compile', 'motionrender_plan_edit', 'motionrender_plan_diff', 'motionrender_plan_review', 'motionrender_scene_catalog', 'motionrender_plan_assets', 'motionrender_plan_repair', 'motionrender_plan_release', 'motionrender_plan_status', 'motionrender_facts', 'motionrender_environment', 'motionrender_init', 'motionrender_render_still']) expect(names, name).toContain(name);
     expect(new Set(names).size).toBe(names.length);
 
     expect(Object.keys(JSON.parse(text(replies.get(3))).properties)).toEqual(expect.arrayContaining(['topic', 'scenes']));
@@ -72,6 +72,27 @@ describe('the MCP server for agents that write the video themselves', () => {
     expect(JSON.parse(replies.get(11).result.contents[0].text).type).toBe('object');
     expect(text(replies.get(12))).toMatch(/Node/);
   }, 120_000);
+});
+
+describe('semantic plan MCP tools', () => {
+  it('validates and compiles a beat-level plan without exposing renderer coordinates', async () => {
+    const out = join(dir, 'plan-built');
+    const plan = { version: '1.0', kind: 'video-plan', id: 'p', name: 'Plan', brief: { prompt: 'p' }, beats: [{ id: 'hook', intent: 'Hook', onScreen: 'Hello' }] };
+    const replies = await talk([
+      { method: 'initialize', params: {} },
+      tool('motionrender_schema', { kind: 'video-plan' }),
+      tool('motionrender_plan_validate', { plan }),
+      tool('motionrender_plan_compile', { plan, outputDir: out }),
+      tool('motionrender_scene_catalog', { intent: 'Compare the old workflow before and after', onScreen: 'Before / after' }),
+      { method: 'resources/read', params: { uri: 'motionrender://schema/video-plan' } },
+    ]);
+    expect(JSON.parse(text(replies.get(2))).properties.kind.const).toBe('video-plan');
+    expect(text(replies.get(3))).toMatch(/Valid video plan "Plan": 1 beats/);
+    expect(text(replies.get(4))).toMatch(/Compiled 1 semantic beats/);
+    expect(existsSync(join(out, 'composition.json'))).toBe(true);
+    expect(JSON.parse(text(replies.get(5)))[0]).toMatchObject({ id: 'before-after' });
+    expect(JSON.parse(replies.get(6).result.contents[0].text).properties.beats).toBeTruthy();
+  }, 30_000);
 });
 
 describe('setup for agents', () => {

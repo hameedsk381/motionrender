@@ -1,0 +1,44 @@
+{
+  "version": "1.0",
+  "kind": "video-plan",
+  "id": "support-launch",
+  "name": "Support, without the ticket maze",
+  "brief": {
+    "prompt": "A concise launch video for a unified customer-support workspace.",
+    "audience": "support leaders",
+    "goal": "Show the before-and-after workflow in fifteen seconds.",
+    "targetDurationSeconds": 15
+  },
+  "format": { "width": 1080, "height": 1920, "fps": 30 },
+  "style": {
+    "visualLanguage": "quiet editorial product film, dark background, warm paper accent",
+    "transition": "fade",
+    "palette": { "bg": "#111217", "surface": "#20232c", "text": "#f7f3ec", "muted": "#a5a9b5", "accent": "#f5a524", "accent2": "#67d5b5" }
+  },
+  "beats": [
+    {
+      "id": "problem",
+      "intent": "Name the fragmented support workflow",
+      "durationSeconds": 4,
+      "onScreen": "Support should not live in six tabs.",
+      "narration": "Your support team should not have to work across six different tabs.",
+      "visual": { "direction": "Build tension with a restrained, editorial text-card treatment.", "transition": "cut" }
+    },
+    {
+      "id": "solution",
+      "intent": "Reveal one calm shared workspace",
+      "durationSeconds": 6,
+      "onScreen": "One shared workspace.",
+      "narration": "Bring messages, customer context, and action into one calm shared workspace.",
+      "visual": { "direction": "Replace the problem with the product proof when a dashboard asset is available.", "transition": "fade" }
+    },
+    {
+      "id": "outcome",
+      "intent": "Land the customer outcome",
+      "durationSeconds": 5,
+      "onScreen": "Faster answers. Better customers.",
+      "narration": "Give every customer a faster answer and every agent a clearer next step.",
+      "visual": { "direction": "Finish with a confident, minimal end card.", "transition": "fade" }
+    }
+  ]
+}

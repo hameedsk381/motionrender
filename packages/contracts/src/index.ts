@@ -53,6 +53,7 @@ export type RevisionRaw = z.infer<typeof revisionRawSchema>;
 
 /* Production plan */
 export type { Production, ProductionCharacter, ProductionEnvironment, ProductionShot, ProductionStyle } from '@ove/schema';
+export type { VideoPlan } from '@ove/schema';
 
 /** One reason a manifest cannot be compiled, with the path the studio should point at. */
 export const productionIssueSchema = z.object({ path: z.string(), message: z.string() });
@@ -195,6 +196,10 @@ export const saveProductionRequest = z.object({
   baseModified: z.number().optional(),
 });
 export const compileProductionRequest = z.object({ id, dryRun: z.boolean().default(false) });
+
+/* Semantic video plan requests */
+export const saveVideoPlanRequest = z.object({ id, plan: z.record(z.string(), z.unknown()), baseModified: z.number().optional() });
+export const compileVideoPlanRequest = z.object({ id, dryRun: z.boolean().default(false), baseModified: z.number().optional(), plan: z.record(z.string(), z.unknown()).optional() });
 
 /** The first problem in a request, in the words the studio shows. */
 export function parseRequest<T extends z.ZodType>(schema: T, body: unknown): z.infer<T> {

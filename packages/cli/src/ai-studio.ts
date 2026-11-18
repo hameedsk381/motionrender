@@ -78,6 +78,7 @@ export async function startAiStudio(options: AiStudioOptions = {}): Promise<AiSt
   const runner = createJobRunner(jobEnvFor(store, requireProvider, providerInfo, true));
   const queue = new InProcessQueue(runner.run);
   const app = createApp({
+    buildScene: async (source, output) => (await import('./build')).buildReact(source, output),
     mode: 'local', store, queue, validate: runner.validate, auth: loopbackAuth, library: studioLibrary, player: studioPlayer, app: studioApp,
     makeThumbnail: (raw, values, baseDir, thumbnailOptions) => makeThumbnail(raw, values, baseDir, { ...thumbnailOptions, allowCode: true }),
     providerState: () => provider

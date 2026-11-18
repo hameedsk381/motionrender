@@ -13,6 +13,7 @@ import { Assets } from './pages/Assets';
 import { Explainer } from './pages/Explainer';
 import { Settings } from './pages/Library';
 import { ProductionPlan } from './pages/ProductionPlan';
+import { SemanticPlan } from './pages/SemanticPlan';
 import { Projects } from './pages/Projects';
 import { Showcase } from './pages/Showcase';
 import { Playground } from './pages/Playground';
@@ -108,6 +109,7 @@ const sections: Record<Route['name'], string> = {
   verify: 'Account',
   making: 'Making your video',
   production: 'Storyboard',
+  'semantic-plan': 'Semantic plan',
   editor: 'Edit video',
   notfound: 'Not found',
 };
@@ -288,6 +290,8 @@ export function App() {
         <Making id={route.id} job={route.job} />
       ) : route.name === 'production' ? (
         <ProductionPlan key={route.id} id={route.id} section={route.section} />
+      ) : route.name === 'semantic-plan' ? (
+        <SemanticPlan key={route.id} id={route.id} />
       ) : route.name === 'generation' ? (
         <Generation />
       ) : route.name === 'editor' ? (

@@ -38,6 +38,7 @@ export type PlayerFiles = { script(): Promise<string>; /** p5.js, for videos wit
 export type AppDeps = {
   /** Local: one person, loopback only, Chromium work may run in this process. Hosted: sign-in required, work only through the queue. */
   mode: 'local' | 'hosted';
+  buildScene?: (source: string, output: string) => Promise<void>;
   store: FsProjectStore;
   queue: JobQueue;
   /** Refuses a bad job request now; the job itself runs wherever the queue runs it. */

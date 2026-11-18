@@ -21,7 +21,7 @@ type UploadRecord = { sha256: string; bytes: number; addedAt: string; originalNa
 const manifestPath = (folder: string) => join(folder, '.manifest.json');
 async function readManifest(folder: string): Promise<Record<string, UploadRecord>> { try { const parsed = JSON.parse(await readFile(manifestPath(folder), 'utf8')); return parsed && typeof parsed === 'object' ? parsed : {}; } catch { return {}; } }
 /** The JSON files a project keeps at its root, each with its own revision history. */
-export type ProjectFile = 'composition.json' | 'production.json';
+export type ProjectFile = 'composition.json' | 'production.json' | 'video.plan.json';
 
 export type TrashedProject = { key: string; id: string; name: string; trashedAt: number };
 const trashKey = /^(.+)-(\d{13})$/;
@@ -40,6 +40,9 @@ export interface ProjectStore {
   readProduction(who: Principal, id: string): Promise<any | undefined>;
   writeProduction(who: Principal, id: string, raw: unknown, meta?: RevisionMeta): Promise<void>;
   productionModified(who: Principal, id: string): Promise<number | undefined>;
+  readVideoPlan(who: Principal, id: string): Promise<any | undefined>;
+  writeVideoPlan(who: Principal, id: string, raw: unknown, meta?: RevisionMeta): Promise<void>;
+  videoPlanModified(who: Principal, id: string): Promise<number | undefined>;
   modified(who: Principal, id: string): Promise<number>;
   duplicate(who: Principal, id: string, rename: (raw: any) => any): Promise<string>;
   /** Moves the project aside so it can be brought back by hand. */
@@ -104,7 +107,7 @@ export class FsProjectStore implements ProjectStore {
   private file(who: Principal, id: string) { return this.named(who, id, 'composition.json'); }
   /** One of the project's root JSON files; anything else is refused rather than turned into a path. */
   private named(who: Principal, id: string, file: ProjectFile) {
-    if (file !== 'composition.json' && file !== 'production.json') throw new Error(`"${file}" is not one of this project's files`);
+    if (file !== 'composition.json' && file !== 'production.json' && file !== 'video.plan.json') throw new Error(`"${file}" is not one of this project's files`);
     return join(this.projectDir(who, id), file);
   }
 
@@ -138,6 +141,15 @@ export class FsProjectStore implements ProjectStore {
   async writeProduction(who: Principal, id: string, raw: unknown, meta?: RevisionMeta) { await this.writeJson(this.named(who, id, 'production.json'), raw, meta); }
   async productionModified(who: Principal, id: string) {
     try { return (await stat(this.named(who, id, 'production.json'))).mtimeMs; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined; throw error; }
+  }
+  async readVideoPlan(who: Principal, id: string) {
+    try { return await this.readJson(this.named(who, id, 'video.plan.json')); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined; throw error; }
+  }
+  async writeVideoPlan(who: Principal, id: string, raw: unknown, meta?: RevisionMeta) { await this.writeJson(this.named(who, id, 'video.plan.json'), raw, meta); }
+  async videoPlanModified(who: Principal, id: string) {
+    try { return (await stat(this.named(who, id, 'video.plan.json'))).mtimeMs; }
     catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined; throw error; }
   }
   async modified(who: Principal, id: string) {

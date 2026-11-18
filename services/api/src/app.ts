@@ -7,6 +7,7 @@ import { aiSettingsRoutes } from './routes/ai-settings';
 import { stockRoutes } from './routes/stock';
 import { jobsRoutes } from './routes/jobs';
 import { productionRoutes } from './routes/production';
+import { videoPlanRoutes } from './routes/video-plan';
 import { projectRoutes } from './routes/projects';
 import { ANONYMOUS, type AppDeps, type Ctx, type Route } from './types';
 
@@ -24,7 +25,7 @@ export function createApp(deps: AppDeps) {
   } };
   // Most specific first: exact API paths, then the file and asset prefixes, then the catch-all for the app's own files.
   const health: Route = { method: 'GET', path: '/healthz', open: true, handle: async c => c.json(200, { ok: true }) };
-  const routes: Route[] = [...(deps.auth.routes?.() ?? []), health, status, ...(deps.aiSettings ? aiSettingsRoutes() : []), ...(deps.stockSettings ? stockRoutes() : []), ...projectRoutes(), ...productionRoutes(), ...jobsRoutes(), ...fileRoutes(), ...publicRoutes()];
+  const routes: Route[] = [...(deps.auth.routes?.() ?? []), health, status, ...(deps.aiSettings ? aiSettingsRoutes() : []), ...(deps.stockSettings ? stockRoutes() : []), ...projectRoutes(), ...productionRoutes(), ...videoPlanRoutes(), ...jobsRoutes(), ...fileRoutes(), ...publicRoutes()];
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', 'http://localhost');

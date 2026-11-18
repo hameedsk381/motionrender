@@ -5,8 +5,8 @@ import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
-import { compositionJsonSchema, explainerJsonSchema, explainerKindDocs, explainerSchema, type Explainer } from '@ove/schema';
-import { checkFfmpeg, describeBrowser } from '@ove/core';
+import { compositionJsonSchema, explainerJsonSchema, explainerKindDocs, explainerSchema, videoPlanJsonSchema, videoPlanSchema, type Explainer } from '@ove/schema';
+import { checkFfmpeg, compileVideoPlan, createReleaseManifest, describeBrowser, diffVideoPlans, editVideoPlan, parseVideoMarkdown, planCollaborationStatus, proposePlanRepairs, recommendPlanAssets, recommendScenes, reviewPlanAssets, reviewVideoPlan, sceneCatalog, videoPlanSummary } from '@ove/core';
 import { gatherFacts, lookupSchema } from '@ove/ai';
 import { buildExplainer } from './explainer';
 import { makeReport, makeVideo, type MakeRender } from './make';
@@ -20,17 +20,72 @@ const scriptInput = {
   file: { type: 'string', description: 'Path to an explainer script (explainer.json)' },
   script: { type: 'object', description: 'The explainer script itself, instead of a file (see motionrender_explainer_kinds for the scenes)' },
 };
+const planInput = {
+  file: { type: 'string', description: 'Path to a semantic video plan (video.plan.json)' },
+  plan: { type: 'object', description: 'The semantic video plan itself: beats, intent, narration, optional media and style; it has no coordinates or keyframes.' },
+  markdown: { type: 'string', description: 'A video.md semantic plan. Headings are beats; use labelled lines such as Intent:, Duration:, On-screen:, Narration:, Claim:, Source:, and Visual:.' },
+};
 
 export const AGENT_TOOLS = [
   {
     name: 'motionrender_make_video',
-    description: 'THE QUICK PATH: check, build and review a video in ONE call, and optionally render it. Give an explainer script or a composition (a file, or the script inline with outputDir). It validates, builds composition.json, runs the design review and returns every problem at once with its path, plus ONE contact-sheet image of the whole video, so no separate validate, compile, still or review calls are needed. Fix what it lists and call it again. render: "draft" makes a quick half-size MP4 to check the motion, "final" the full-quality video; leave it out while you are still fixing problems. Nothing is rendered over review errors.',
+    description: 'THE QUICK PATH: check, build and review a video in ONE call, and optionally render it. Give an explainer script, semantic video plan, or composition file. It validates, builds composition.json, runs the design review and returns every problem at once with its path, plus ONE contact-sheet image of the whole video, so no separate validate, compile, still or review calls are needed. Fix what it lists and call it again. render: "draft" makes a quick half-size MP4 to check the motion, "final" the full-quality video; leave it out while you are still fixing problems. Nothing is rendered over review errors.',
     inputSchema: { type: 'object', properties: { ...scriptInput, outputDir: { type: 'string', description: 'Where explainer.json and the results go (required with an inline script)' }, render: { type: 'string', enum: ['none', 'draft', 'final'], description: 'Render after the checks (default none)' }, voice: { type: 'boolean', description: 'Record the explainer lines with the free Edge voice (default true; false is faster and silent)' }, voiceName: { type: 'string' }, output: { type: 'string', description: 'The MP4 path (default draft.mp4 or out.mp4 beside the file)' }, allowCode: { type: 'boolean', description: 'Run react, code and p5 layers (only for files you trust)' } } },
   },
   {
     name: 'motionrender_schema',
     description: 'The JSON Schema for a MotionRender composition or an explainer script. Read it before writing either by hand; it lists every field, default and limit.',
-    inputSchema: { type: 'object', properties: { kind: { type: 'string', enum: ['composition', 'explainer'], description: 'Which schema (default composition)' } } },
+    inputSchema: { type: 'object', properties: { kind: { type: 'string', enum: ['composition', 'explainer', 'video-plan'], description: 'Which schema (default composition)' } } },
+  },
+  {
+    name: 'motionrender_plan_validate',
+    description: 'Validate a semantic video plan. Plans describe beats, their communication intent, narration, optional media and style—not renderer coordinates or keyframes. Give a file or the plan inline.',
+    inputSchema: { type: 'object', properties: planInput },
+  },
+  {
+    name: 'motionrender_plan_compile',
+    description: 'Compile a semantic video plan into the deterministic composition.json render target. Beats with no media become editable text-card placeholders, so an agent can establish the narrative before sourcing or generating visuals.',
+    inputSchema: { type: 'object', properties: { ...planInput, outputDir: { type: 'string', description: 'Where composition.json goes; required with an inline plan.' } } },
+  },
+  {
+    name: 'motionrender_plan_edit',
+    description: 'Apply intent-preserving changes to a semantic video plan and return the refined plan plus a beat-level diff. Edits address beat ids—not generated composition layers—so copy, timing, ordering, media direction and style stay reversible.',
+    inputSchema: { type: 'object', properties: { ...planInput, edits: { type: 'array', description: 'Semantic operations: update-beat, insert-beat, remove-beat, move-beat, update-brief, or set-style.', items: { type: 'object' } } }, required: ['edits'] },
+  },
+  {
+    name: 'motionrender_plan_diff',
+    description: 'Compare two semantic video plans before recompiling. Returns added, removed, moved and changed beats; evidence/source changes; style changes; and duration impact. It never writes or renders.',
+    inputSchema: { type: 'object', properties: { before: { type: 'object', description: 'The original semantic video plan.' }, after: { type: 'object', description: 'The proposed semantic video plan.' } }, required: ['before', 'after'] },
+  },
+  {
+    name: 'motionrender_plan_review',
+    description: 'Run a fast, no-render review of a semantic plan. It checks duration against the brief, rhythm, copy reading time, narration speed, unused evidence, and beats still using visual placeholders.',
+    inputSchema: { type: 'object', properties: planInput },
+  },
+  {
+    name: 'motionrender_scene_catalog',
+    description: 'List the semantic scene catalog or recommend scene shapes for one beat. Each entry has a communication purpose, when to use or avoid it, and required inputs. Use the chosen id in visual.scene; plan review checks the contract before rendering.',
+    inputSchema: { type: 'object', properties: { intent: { type: 'string', description: 'What this beat needs to communicate.' }, onScreen: { type: 'string', description: 'Proposed on-screen copy.' }, visualDirection: { type: 'string', description: 'Proposed visual direction.' }, hasMedia: { type: 'boolean', description: 'Whether an approved media asset is available.' } } },
+  },
+  {
+    name: 'motionrender_plan_assets',
+    description: 'Review declared plan assets and rank the best eligible visual assets for each beat (or one beat). Scores explain scene fit, media type, metadata matches, approval status, and rights constraints; no plan is changed.',
+    inputSchema: { type: 'object', properties: { ...planInput, beatId: { type: 'string', description: 'Recommend assets for this beat only; omit for every beat.' } } },
+  },
+  {
+    name: 'motionrender_plan_repair',
+    description: 'Turn issues returned by a rendered composition review into reversible semantic plan-edit proposals. It maps review frames back to plan beat ids and never writes or applies an edit; inspect the returned edits, then send selected ones to motionrender_plan_edit.',
+    inputSchema: { type: 'object', properties: { ...planInput, issues: { type: 'array', description: 'Review issues from motionrender_review_video or mr make, each with severity, code, message, and optional frame/layer.', items: { type: 'object' } } }, required: ['issues'] },
+  },
+  {
+    name: 'motionrender_plan_release',
+    description: 'Build a publish handoff manifest for a semantic plan. It records an immutable plan digest, final approval status, output format, variable rows needed for localization/personalization, requested channels, and every blocker. It never publishes or renders.',
+    inputSchema: { type: 'object', properties: { ...planInput, channels: { type: 'array', items: { type: 'string' }, description: 'Delivery channels, such as web, youtube, tiktok, linkedin.' }, requireFinalApproval: { type: 'boolean', description: 'Require an approved final checkpoint (default true).' } } },
+  },
+  {
+    name: 'motionrender_plan_status',
+    description: 'Return the shared collaboration dashboard for a semantic plan: open/resolved comments by beat, current and append-only approval history, and release readiness/blockers. It is read-only.',
+    inputSchema: { type: 'object', properties: { ...planInput, channels: { type: 'array', items: { type: 'string' } } } },
   },
   {
     name: 'motionrender_explainer_kinds',
@@ -71,12 +126,97 @@ async function readScript(args: Record<string, any>): Promise<{ spec: unknown; d
   return { spec: JSON.parse((await readFile(file, 'utf8')).replace(/^﻿/, '')), dir: dirname(file) };
 }
 
+async function readPlan(args: Record<string, any>): Promise<{ spec: unknown; dir?: string }> {
+  if (args.plan !== undefined) return { spec: args.plan };
+  if (args.markdown !== undefined) return { spec: parseVideoMarkdown(String(args.markdown)) };
+  if (!args.file) throw new Error('Give a file or a plan');
+  const file = resolve(String(args.file));
+  const text = (await readFile(file, 'utf8')).replace(/^﻿/, '');
+  return { spec: file.toLowerCase().endsWith('.md') ? parseVideoMarkdown(text) : JSON.parse(text), dir: dirname(file) };
+}
+
 const problems = (error: z.ZodError) => error.issues.map(issue => `${issue.path.join('.') || 'script'}: ${issue.message}`);
 
 export async function handleAgentTool(name: string, args: Record<string, any>): Promise<ToolResult | undefined> {
   switch (name) {
     case 'motionrender_schema':
-      return reply(json(args.kind === 'explainer' ? explainerJsonSchema : compositionJsonSchema));
+      return reply(json(args.kind === 'explainer' ? explainerJsonSchema : args.kind === 'video-plan' ? videoPlanJsonSchema : compositionJsonSchema));
+
+    case 'motionrender_plan_validate': {
+      const { spec } = await readPlan(args), parsed = videoPlanSchema.safeParse(spec);
+      if (!parsed.success) return reply(`The video plan cannot be used:\n${problems(parsed.error).map(line => `- ${line}`).join('\n')}`, true);
+      const summary = videoPlanSummary(parsed.data);
+      return reply(`Valid video plan "${parsed.data.name}": ${summary.beats} beats, ${summary.seconds.toFixed(1)} s, ${summary.placeholders} editable placeholder${summary.placeholders === 1 ? '' : 's'}.`);
+    }
+
+    case 'motionrender_plan_compile': {
+      const { spec, dir } = await readPlan(args), parsed = videoPlanSchema.safeParse(spec);
+      if (!parsed.success) return reply(`The video plan cannot be used:\n${problems(parsed.error).map(line => `- ${line}`).join('\n')}`, true);
+      const target = args.outputDir ? resolve(String(args.outputDir)) : dir;
+      if (!target) throw new Error('outputDir is required when the plan is given inline');
+      await mkdir(target, { recursive: true });
+      const built = compileVideoPlan(parsed.data), output = join(target, 'composition.json');
+      await writeFile(output, JSON.stringify(built.composition, null, 2) + '\n');
+      return reply(`Compiled ${parsed.data.beats.length} semantic beats to ${output}${built.notes.length ? `\nNotes:\n${built.notes.map(note => `- ${note}`).join('\n')}` : ''}`);
+    }
+
+    case 'motionrender_plan_edit': {
+      const { spec } = await readPlan(args), parsed = videoPlanSchema.safeParse(spec);
+      if (!parsed.success) return reply(`The video plan cannot be used:\n${problems(parsed.error).map(line => `- ${line}`).join('\n')}`, true);
+      try {
+        const result = editVideoPlan(parsed.data, args.edits);
+        return reply(json({ plan: result.plan, changes: result.changes }));
+      } catch (error) { return reply(`The plan edits cannot be used:\n- ${(error as Error).message}`, true); }
+    }
+
+    case 'motionrender_plan_diff': {
+      try { return reply(json(diffVideoPlans(args.before, args.after))); }
+      catch (error) { return reply(`The plans cannot be compared:\n- ${(error as Error).message}`, true); }
+    }
+
+    case 'motionrender_plan_review': {
+      const { spec } = await readPlan(args), parsed = videoPlanSchema.safeParse(spec);
+      if (!parsed.success) return reply(`The video plan cannot be used:\n${problems(parsed.error).map(line => `- ${line}`).join('\n')}`, true);
+      return reply(json({ issues: reviewVideoPlan(parsed.data) }));
+    }
+
+    case 'motionrender_scene_catalog': {
+      const query = { intent: typeof args.intent === 'string' ? args.intent : undefined, onScreen: typeof args.onScreen === 'string' ? args.onScreen : undefined, visualDirection: typeof args.visualDirection === 'string' ? args.visualDirection : undefined, hasMedia: typeof args.hasMedia === 'boolean' ? args.hasMedia : undefined };
+      const requested = query.intent || query.onScreen || query.visualDirection || query.hasMedia !== undefined;
+      return reply(json(requested ? recommendScenes(query) : sceneCatalog));
+    }
+
+    case 'motionrender_plan_assets': {
+      const { spec } = await readPlan(args), parsed = videoPlanSchema.safeParse(spec);
+      if (!parsed.success) return reply(`The video plan cannot be used:\n${problems(parsed.error).map(line => `- ${line}`).join('\n')}`, true);
+      try {
+        const recommendations = args.beatId ? { [String(args.beatId)]: recommendPlanAssets(parsed.data, String(args.beatId)) } : Object.fromEntries(parsed.data.beats.map(beat => [beat.id, recommendPlanAssets(parsed.data, beat.id).slice(0, 3)]));
+        return reply(json({ recommendations, issues: reviewPlanAssets(parsed.data) }));
+      } catch (error) { return reply((error as Error).message, true); }
+    }
+
+    case 'motionrender_plan_repair': {
+      const { spec } = await readPlan(args), parsed = videoPlanSchema.safeParse(spec);
+      if (!parsed.success) return reply(`The video plan cannot be used:\n${problems(parsed.error).map(line => `- ${line}`).join('\n')}`, true);
+      const issues = Array.isArray(args.issues) ? args.issues.filter((issue: any) => issue && typeof issue.code === 'string' && typeof issue.message === 'string' && ['error', 'warning', 'info'].includes(issue.severity)).map((issue: any) => ({ severity: issue.severity, code: issue.code, message: issue.message, ...(Number.isFinite(issue.frame) ? { frame: issue.frame } : {}), ...(typeof issue.layer === 'string' ? { layer: issue.layer } : {}) })) : [];
+      if (!issues.length) return reply('issues must contain one or more review findings with severity, code, and message', true);
+      return reply(json({ proposals: proposePlanRepairs(parsed.data, issues) }));
+    }
+
+    case 'motionrender_plan_release': {
+      const { spec } = await readPlan(args), parsed = videoPlanSchema.safeParse(spec);
+      if (!parsed.success) return reply(`The video plan cannot be used:\n${problems(parsed.error).map(line => `- ${line}`).join('\n')}`, true);
+      const channels = Array.isArray(args.channels) ? args.channels.filter((channel: unknown): channel is string => typeof channel === 'string') : undefined;
+      const manifest = createReleaseManifest(parsed.data, { channels, requireFinalApproval: args.requireFinalApproval !== false });
+      return reply(json(manifest), manifest.status !== 'ready');
+    }
+
+    case 'motionrender_plan_status': {
+      const { spec } = await readPlan(args), parsed = videoPlanSchema.safeParse(spec);
+      if (!parsed.success) return reply(`The video plan cannot be used:\n${problems(parsed.error).map(line => `- ${line}`).join('\n')}`, true);
+      const channels = Array.isArray(args.channels) ? args.channels.filter((channel: unknown): channel is string => typeof channel === 'string') : undefined;
+      return reply(json(planCollaborationStatus(parsed.data, { channels })));
+    }
 
     case 'motionrender_make_video': {
       let file = args.file ? resolve(String(args.file)) : undefined;
@@ -147,11 +287,12 @@ export async function handleAgentTool(name: string, args: Record<string, any>): 
   }
 }
 
-/** Skills and schemas as MCP resources, for clients that read them: motionrender://skill/<name>, motionrender://schema/composition|explainer. */
+/** Skills and schemas as MCP resources, for clients that read them: motionrender://skill/<name>, motionrender://schema/<kind>. */
 export async function listResources(): Promise<{ uri: string; name: string; description: string; mimeType: string }[]> {
   const resources = [
     { uri: 'motionrender://schema/composition', name: 'Composition JSON Schema', description: 'Every field of a composition.json', mimeType: 'application/json' },
     { uri: 'motionrender://schema/explainer', name: 'Explainer JSON Schema', description: 'Every field of an explainer script', mimeType: 'application/json' },
+    { uri: 'motionrender://schema/video-plan', name: 'Semantic video-plan JSON Schema', description: 'Beat-level authoring without renderer coordinates or keyframes', mimeType: 'application/json' },
   ];
   if (!existsSync(skillsRoot)) return resources;
   for (const entry of await readdir(skillsRoot)) {
@@ -166,6 +307,7 @@ export async function listResources(): Promise<{ uri: string; name: string; desc
 export async function readResource(uri: string): Promise<{ uri: string; mimeType: string; text: string }> {
   if (uri === 'motionrender://schema/composition') return { uri, mimeType: 'application/json', text: json(compositionJsonSchema) };
   if (uri === 'motionrender://schema/explainer') return { uri, mimeType: 'application/json', text: json(explainerJsonSchema) };
+  if (uri === 'motionrender://schema/video-plan') return { uri, mimeType: 'application/json', text: json(videoPlanJsonSchema) };
   const skill = uri.match(/^motionrender:\/\/skill\/([a-z0-9-]+)$/)?.[1];
   if (!skill) throw new Error(`Unknown resource ${uri}`);
   const file = join(skillsRoot, skill, 'SKILL.md');

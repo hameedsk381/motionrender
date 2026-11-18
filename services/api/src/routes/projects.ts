@@ -62,7 +62,7 @@ export function projectRoutes(): Route[] {
   // Only the two root documents have histories; a request naming anything else is refused rather than guessed at.
   const projectFile = (file: string): ProjectFile => {
     const name = file.split('/').slice(1).join('/');
-    if (name !== 'composition.json' && name !== 'production.json') throw new Error(`"${file}" is not a project file with a history`);
+    if (name !== 'composition.json' && name !== 'production.json' && name !== 'video.plan.json') throw new Error(`"${file}" is not a project file with a history`);
     return name;
   };
 

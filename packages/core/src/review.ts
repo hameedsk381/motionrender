@@ -6,6 +6,7 @@
 import type { Composition } from '@ove/schema'; import { createRenderer, defaultConcurrency } from '@ove/renderer'; import type { FrameReport, TextNote } from '@ove/graphics'; import { measureLoudness, sourceOf } from './audio'; import { captionTrack, measureSource } from './media'; import { layerWindows } from '@ove/timeline';
 export type ReviewIssue = { severity: 'error' | 'warning' | 'info'; code: string; message: string; frame?: number; layer?: string; suggestion?: Record<string, unknown> };
 export type ReviewResult = { issues: ReviewIssue[]; sheet: Buffer; sheetFrames: number[]; sampledFrames: number; loudness?: { integrated: number; truePeak: number } };
+export type ReviewRepairTask = { id: string; severity: ReviewIssue['severity']; target: { sceneId?: string; beatId?: string; layer?: string; frame?: number }; category: 'layout' | 'copy' | 'motion' | 'audio' | 'continuity' | 'style'; instruction: string; issues: ReviewIssue[] };
 export type SafeZone = { top?: number; bottom?: number; left?: number; right?: number };
 export type ReviewOptions = { allowCode?: boolean; baseDir?: string; every?: number; sheetFrames?: number; columns?: number; concurrency?: number; audio?: boolean; safeZone?: SafeZone; showSafeZones?: boolean; onProgress?: (done: number, total: number) => void };
 
@@ -35,6 +36,35 @@ export function safeZoneBands(width: number, height: number, override?: SafeZone
   if (inset.top) bands.push({ name: 'top UI band', hint: `search and the camera cover the top ${Math.round(inset.top * height)} px: keep text below y ${Math.round(inset.top * height)}`, x0: 0, y0: 0, x1: width, y1: inset.top * height });
   if (inset.left) bands.push({ name: 'left UI band', hint: `keep text right of x ${Math.round(inset.left * width)}`, x0: 0, y0: 0, x1: inset.left * width, y1: height });
   return bands;
+}
+
+/**
+ * Turns renderer findings into small, agent-actionable work items. This intentionally
+ * does not mutate a composition: a plan/agent decides the creative fix, while the
+ * target identifies the semantic beat when the composition was compiled from one.
+ */
+export function reviewRepairTasks(composition: Composition, issues: ReviewIssue[]): ReviewRepairTask[] {
+  const category = (code: string): ReviewRepairTask['category'] => {
+    if (['off-frame', 'overlap', 'safe-zone', 'text-cut'].includes(code)) return 'layout';
+    if (['small-text', 'busy', 'read-time', 'headlines', 'caption-flash', 'caption-speed'].includes(code)) return 'copy';
+    if (['frozen', 'uniform-scenes', 'mixed-transitions'].includes(code)) return 'motion';
+    if (['quiet', 'loud', 'peaks', 'sound-cut'].includes(code)) return 'audio';
+    if (code === 'continuity') return 'continuity';
+    return 'style';
+  };
+  const instruction = (kind: ReviewRepairTask['category'], issue: ReviewIssue) => ({
+    layout: 'Adjust this beat’s scene layout or module props; preserve its narrative intent and keep readable copy inside the frame and safe zones.',
+    copy: 'Edit this beat’s on-screen copy, narration, or duration so the message remains readable without competing for attention.',
+    motion: 'Adjust this beat’s duration, visual direction, or transition to restore deliberate pacing and motion.',
+    audio: 'Adjust the relevant audio layer or export loudness; preserve the planned narration and music relationship.',
+    continuity: 'Keep the shared element in a consistent place across the cut, or give the two beats a deliberate transition.',
+    style: `Resolve the review finding while preserving the plan’s intended visual language: ${issue.message}`,
+  })[kind];
+  return issues.map((issue, index) => {
+    const scene = issue.frame === undefined ? undefined : composition.scenes.find(candidate => issue.frame! >= candidate.startFrame && issue.frame! < candidate.startFrame + candidate.durationFrames);
+    const kind = category(issue.code);
+    return { id: `repair-${index + 1}`, severity: issue.severity, target: { ...(scene ? { sceneId: scene.id, ...(scene.beat ? { beatId: scene.beat } : {}) } : {}), ...(issue.layer ? { layer: issue.layer } : {}), ...(issue.frame === undefined ? {} : { frame: issue.frame }) }, category: kind, instruction: instruction(kind, issue), issues: [issue] };
+  });
 }
 
 export async function reviewComposition(composition: Composition, options: ReviewOptions = {}): Promise<ReviewResult> { const { fps, width, height, durationFrames }=composition, baseDir=options.baseDir ?? process.cwd();

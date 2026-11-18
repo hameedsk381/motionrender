@@ -31,6 +31,7 @@ export const commandSpecs: Record<string, Spec> = {
   captions: { values: ['--output', ...variables], positionals: 1 },
   script: { values: ['--output', '--set'], flags: ['--json'], positionals: 1 },
   production: { values: ['--output'], flags: ['--json'], positionals: 2 },
+  plan: { values: ['--output', '--edits', '--provider', '--model', '--base-url', '--duration', '--format', '--fps', '--audience', '--goal', '--max-attempts', '--beat', '--channel'], flags: ['--draft', '--final', '--no-final-approval', '--constrained'], positionals: 3 },
   make: { values: ['--output', '--sheet', '--voice', '--every'], flags: ['--draft', '--final', '--no-voice', '--react', '--no-react', '--allow-code', '--json'], positionals: 1 },
   explainer: { values: ['--output', '--voice', '--provider', '--model', '--base-url', '--scenes', '--language', '--media'], flags: ['--no-voice', '--images', '--stock', '--research', '--json'], positionals: 2 },
   still: { values: ['--frame', '--output', '--aspect', ...variables], flags: ['--transparent', '--allow-code'], positionals: 1 },

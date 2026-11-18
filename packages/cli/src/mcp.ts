@@ -5,7 +5,7 @@ import readline from 'node:readline';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { createProvider, refineVideo, writeCompositionProject, planBatch, renderBatch, captionAudio, createLaunchReel, type ComposeOptions } from '@ove/ai';
-import { loadComposition, renderMedia, renderStill, reviewComposition, measureMedia, adaptCompositionAspect, importFigmaTokens, importFigmaFrame, fetchFigmaFile, compileProduction } from '@ove/core';
+import { loadComposition, renderMedia, renderStill, reviewComposition, reviewRepairTasks, measureMedia, adaptCompositionAspect, importFigmaTokens, importFigmaFrame, fetchFigmaFile, compileProduction } from '@ove/core';
 import { composeSmart } from './compose-source';
 import { listThemes, listBlocks } from './blocks';
 import { readScript, scriptMarkdown } from './script';
@@ -471,6 +471,7 @@ Next actions you can take:
 
       const errors = result.issues.filter(i => i.severity === 'error');
       const warnings = result.issues.filter(i => i.severity === 'warning');
+      const repairs = reviewRepairTasks(composition, result.issues);
 
       return {
         content: [{
@@ -478,7 +479,7 @@ Next actions you can take:
           text: `Design review finished:
 - Contact sheet: ${output} (${result.sheetFrames.length} sampled frames)
 - Results: ${errors.length} errors, ${warnings.length} warnings
-${result.issues.length ? '\nIssues found:\n' + result.issues.map(i => `[${i.severity.toUpperCase()}] ${i.frame !== undefined ? `frame ${i.frame}: ` : ''}${i.message}`).join('\n') : 'All automated design & contrast checks passed cleanly!'}`
+${result.issues.length ? '\nIssues found:\n' + result.issues.map(i => `[${i.severity.toUpperCase()}] ${i.frame !== undefined ? `frame ${i.frame}: ` : ''}${i.message}`).join('\n') + '\n\nRepair tasks:\n' + repairs.map(task => `- ${task.id}${task.target.beatId ? ` [beat ${task.target.beatId}]` : task.target.sceneId ? ` [scene ${task.target.sceneId}]` : ''}: ${task.instruction}`).join('\n') : 'All automated design & contrast checks passed cleanly!'}`
         }],
         isError: false
       };

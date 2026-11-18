@@ -205,6 +205,7 @@ Press Ctrl+C to stop.`);
   else if (command === 'ai') { if (!file) { const { aiUsage } = await import('./ai'); console.log(aiUsage); } else process.exitCode=await (await import('./ai')).runAi(argv); }
   else if (command === 'script') await (await import('./script')).runScript(argv);
   else if (command === 'production') await (await import('./production')).runProduction(argv);
+  else if (command === 'plan') await (await import('./plan')).runPlan(argv);
   else if (command === 'facts') await (await import('./facts')).runFacts(argv);
   else if (command === 'explainer') await (await import('./explainer')).runExplainer(argv);
   else if (command === 'make') await (await import('./make-command')).runMake(argv);

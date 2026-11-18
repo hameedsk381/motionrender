@@ -4,7 +4,7 @@ import { api, cleanUserStatus, dur, runJob, type Block, type CompileProductionRe
 import { composeNotesKey } from '../composeReport';
 import { MediaPanel } from './Media';
 import { PlayerView, type CompareTarget, type PlayerHandle } from '../Player';
-import { editorPath, go, planPath } from '../router';
+import { editorPath, go, planPath, semanticPlanPath } from '../router';
 import type { LayerMove } from '../safeZone';
 import {
   ArrowLeftIcon,
@@ -348,6 +348,9 @@ export function Editor({ id, tab }: { id: string; tab: string }) {
           <TitleInput detail={detail} save={name => save('/api/project/rename', { id, name }, 'Renamed')} />
           <Button size="sm" variant="secondary" className="collapse" icon={<LayersIcon size={14} />} title="Open the storyboard" aria-label="Storyboard" onClick={() => go(planPath(id))}>
             <span className="lbl">Storyboard</span>
+          </Button>
+          <Button size="sm" variant="secondary" className="collapse" title="Open the semantic plan" onClick={() => go(semanticPlanPath(id))}>
+            <span className="lbl">Plan</span>
           </Button>
 
           {/* Instant Aspect Ratio Switcher */}
