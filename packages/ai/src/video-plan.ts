@@ -7,7 +7,7 @@ import { extractJson } from './json';
 import type { AiProvider, ChatMessage } from './providers';
 
 export type DirectVideoPlanOptions = {
-  story?: { design: DesignHandoff; beats: { id: string; intent: string; scene: SceneInput['type'] }[] };
+  story?: { design: DesignHandoff; beats: { id: string; intent: string; scene: SceneInput['type']; storyboard?: VideoPlan['beats'][number]['storyboard'] }[] };
   previousPlans?: VideoPlan[];
   durationSeconds?: number;
   width?: number;
@@ -43,7 +43,7 @@ export function directorPrompt(brief: string, options: DirectVideoPlanOptions = 
     'Reply with one JSON object only. This plan is authored by people and agents; it must describe narrative intent and visual direction, never pixels, layers, keyframes, CSS, or code.',
     `Use this exact contract shape (add beats as appropriate):\n${JSON.stringify(skeleton, null, 2)}`,
     `The total of durationSeconds must be about ${duration} seconds. Use 3–7 purposeful beats: hook, development/proof, and a decisive ending.`,
-    `Each beat needs a stable kebab-case id, an intent (the communication job), short onScreen copy where useful, optional narration, and a concrete visual.direction. Select visual.scene from this catalog when a shape fits; satisfy its required inputs. Use varied transitions sparingly.\n${sceneCatalogMarkdown()}`,
+    `Each beat needs a stable kebab-case id, an intent (the communication job), short onScreen copy where useful, optional narration, and a concrete visual.direction. Include a storyboard object with visible, change, takeaway (one short line each), and moment (fraction of this beat at which to inspect the action). Select visual.scene from this catalog when a shape fits; satisfy its required inputs. Use varied transitions sparingly.\n${sceneCatalogMarkdown()}`,
     'Do not invent facts, dates, customer results, or statistics. Unless the user supplied verified sources, omit claim, data, sources and sourceIds entirely. Do not fake citations.',
     'Choose a visual world specific to the brief rather than defaulting to dark gradients or generic glass cards. Keep copy readable and make the first beat visually active.',
   ].join('\n') }, { role: 'user', content: `Direct this video:\n${brief.trim()}${options.audience ? `\nAudience: ${options.audience}` : ''}${options.goal ? `\nGoal: ${options.goal}` : ''}` }];

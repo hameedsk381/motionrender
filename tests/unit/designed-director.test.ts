@@ -1,8 +1,9 @@
 import { expect, it } from 'vitest';
 import { directDesignedVideo, type AiProvider } from '@ove/ai';
-import { comparePlanVariety } from '@ove/core';
+import { comparePlanVariety, compileVideoPlan, parseVideoMarkdown } from '@ove/core';
 
-const story = () => ({ design: { concept: 'A contribution connects a community', visualMetaphor: 'Connections grow outward', motif: 'Contributor paths', typography: { display: 'Inter', body: 'Inter', treatment: 'Short phrases' }, motion: 'Follow connections', avoid: [], acts: [{ id: 'journey', purpose: 'Show participation', beatIds: ['invite', 'participate'], field: '#ffffff', ink: '#102030' }] }, beats: [{ id: 'invite', intent: 'Invite participation', scene: 'decisive-cta' }, { id: 'participate', intent: 'Explain participation', scene: 'workflow' }] });
+const storyboard = { visible: 'Three contributor paths', change: 'Each path appears in turn', takeaway: 'Three steps connect contributors', moment: 0.8 };
+const story = () => ({ design: { concept: 'A contribution connects a community', visualMetaphor: 'Connections grow outward', motif: 'Contributor paths', typography: { display: 'Inter', body: 'Inter', treatment: 'Short phrases' }, motion: 'Follow connections', avoid: [], acts: [{ id: 'journey', purpose: 'Show participation', beatIds: ['invite', 'participate'], field: '#ffffff', ink: '#102030' }] }, beats: [{ id: 'invite', storyboard, intent: 'Invite participation', scene: 'decisive-cta' }, { id: 'participate', storyboard, intent: 'Explain participation', scene: 'workflow' }] });
 const provider = (values: unknown[]): AiProvider => ({ id: 'fixture', model: 'fixture', baseUrl: '', chat: async () => { const value = values.shift(); return typeof value === 'string' ? value : JSON.stringify(value); } });
 const inputs = () => [{ type: 'decisive-cta', headline: 'Join the community', layout: 'corner', choreography: 'reveal' }, { type: 'workflow', headline: 'Contribute together', steps: ['Connect', 'Learn', 'Contribute'], layout: 'radial', choreography: 'trace' }];
 
@@ -11,6 +12,9 @@ it('uses model-directed sequence and beat IDs rather than fixed roles', async ()
   expect(result.plan.beats.map(beat => beat.id)).toEqual(['invite', 'participate']);
   expect(result.plan.beats.map(beat => beat.visual.scene)).toEqual(['decisive-cta', 'workflow']);
   expect(result.plan.design?.concept).toBe('A contribution connects a community');
+  const parsed = parseVideoMarkdown(result.markdown);
+  expect(parsed.beats[0]?.storyboard).toEqual(storyboard);
+  expect(compileVideoPlan(parsed).composition.scenes[0]?.metadata.storyboard).toEqual(storyboard);
   expect(result.attempts).toBe(3);
 });
 

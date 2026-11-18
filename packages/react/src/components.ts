@@ -748,7 +748,7 @@ export function CodeEditor({
       }, filename),
       createElement('div', {
         style: {
-          color: '#64748b',
+          color: '#a3b2c6',
           fontSize: 11,
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
@@ -778,7 +778,7 @@ export function CodeEditor({
           style: {
             width: 32,
             flexShrink: 0,
-            color: isHighlighted ? '#38bdf8' : '#475569',
+            color: isHighlighted ? '#38bdf8' : '#94a3b8',
             userSelect: 'none',
             textAlign: 'right',
             marginRight: 16,

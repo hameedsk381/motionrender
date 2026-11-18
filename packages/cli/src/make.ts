@@ -27,7 +27,7 @@ export type MakeResult = {
   /** Problems that stopped the build, with their paths. Empty when the file was built. */ problems: string[];
   composition?: string;
   summary?: { scenes: number; seconds: number; width: number; height: number; fps: number; spoken?: number };
-  review?: { sheet: string; sheetFrames: number[]; errors: ReviewIssue[]; warnings: ReviewIssue[]; notes: ReviewIssue[]; repairs: ReviewRepairTask[]; planRepairs?: PlanRepairProposal[]; loudness?: { integrated: number; truePeak: number } };
+  review?: { checkpoints?: Awaited<ReturnType<typeof reviewComposition>>["checkpoints"]; sheet: string; sheetFrames: number[]; errors: ReviewIssue[]; warnings: ReviewIssue[]; notes: ReviewIssue[]; repairs: ReviewRepairTask[]; planRepairs?: PlanRepairProposal[]; loudness?: { integrated: number; truePeak: number } };
   video?: { output: string; draft: boolean; seconds: number; frames: number; renderSeconds: number };
   notes: string[];
   timings: Record<string, number>;
@@ -88,7 +88,7 @@ export async function makeVideo(options: MakeOptions): Promise<MakeResult> {
   await writeFile(sheet, reviewed.sheet);
   timings.review = seconds(started);
   const bySeverity = (severity: ReviewIssue['severity']) => reviewed.issues.filter(issue => issue.severity === severity);
-  const review = { sheet, sheetFrames: reviewed.sheetFrames, errors: bySeverity('error'), warnings: bySeverity('warning'), notes: bySeverity('info'), repairs: reviewRepairTasks(composition, reviewed.issues), ...(plan ? { planRepairs: proposePlanRepairs(plan, reviewed.issues) } : {}), loudness: reviewed.loudness };
+  const review = { checkpoints: reviewed.checkpoints, sheet, sheetFrames: reviewed.sheetFrames, errors: bySeverity('error'), warnings: bySeverity('warning'), notes: bySeverity('info'), repairs: reviewRepairTasks(composition, reviewed.issues), ...(plan ? { planRepairs: proposePlanRepairs(plan, reviewed.issues) } : {}), loudness: reviewed.loudness };
   const clean = review.errors.length === 0;
 
   // 3. Render, only when asked, and not over unresolved errors.

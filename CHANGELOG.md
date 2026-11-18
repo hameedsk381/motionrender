@@ -4,6 +4,12 @@ All notable changes to MotionRender (formerly Open Video Engine). The published 
 
 ## Unreleased
 
+## 0.10.0 (2026-11-18)
+
+- Author storyboards in Markdown or Studio and review the motion around each beat's decisive frame.
+- Direct React designs across 17 scene kinds with `mr plan direct --react`. Semantic workflows can now draw one source branching to two outcomes.
+- Export checkpoint clips, reuse eligible primitive frames across local renders, and replace an MP4 soundtrack while preserving its encoded video.
+
 ## 0.9.0 (2026-11-18)
 
 ### Added

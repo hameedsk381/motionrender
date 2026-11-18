@@ -42,6 +42,10 @@ export function compileVideoPlan(input: VideoPlan | unknown): CompiledProduction
     scene.layers = [...media, ...visual.layers, ...audio] as any;
     compiled.notes.push(`Beat "${beat.id}" compiled as ${visual.note} from semantic scene "${beat.visual.scene}".`);
   }
+  for (const scene of compiled.composition.scenes) {
+    const board = plan.beats.find(beat => beat.id === scene.id)?.storyboard;
+    if (board) scene.metadata.storyboard = board;
+  }
   const modules = new Map(plan.sceneModules.map(module => [module.id, module]));
   for (const beat of plan.beats) {
     const module = beat.visual.module ? modules.get(beat.visual.module) : undefined;

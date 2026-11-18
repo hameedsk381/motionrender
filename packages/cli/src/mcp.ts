@@ -478,6 +478,7 @@ Next actions you can take:
           type: 'text',
           text: `Design review finished:
 - Contact sheet: ${output} (${result.sheetFrames.length} sampled frames)
+${(result.checkpoints ?? []).map(point => `- Check frame ${point.frame} (${point.scene}): ${point.visible}. Look for: ${point.takeaway}`).join("\n")}
 - Results: ${errors.length} errors, ${warnings.length} warnings
 ${result.issues.length ? '\nIssues found:\n' + result.issues.map(i => `[${i.severity.toUpperCase()}] ${i.frame !== undefined ? `frame ${i.frame}: ` : ''}${i.message}`).join('\n') + '\n\nRepair tasks:\n' + repairs.map(task => `- ${task.id}${task.target.beatId ? ` [beat ${task.target.beatId}]` : task.target.sceneId ? ` [scene ${task.target.sceneId}]` : ''}: ${task.instruction}`).join('\n') : 'All automated design & contrast checks passed cleanly!'}`
         }],

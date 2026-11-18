@@ -615,7 +615,7 @@ function compileWith(spec: Explainer, options: CompileOptions, palette: Record<s
       const id = `s${i + 1}-${scene.kind}`;
       if (scene.kind === 'media' && !scene.src) throw new Error('A media scene that is still a prompt has no picture yet: make the pictures first (mr explainer compile does, with an image model)');
       reactScenes.push({ sceneId: id, index: i, scene, frames, captions: !!cues });
-      return { id, name: `${i + 1}. ${scene.kind} (react)`, durationFrames: frames,
+      return { id, name: `${i + 1}. ${scene.kind} (react)`, durationFrames: frames, metadata: { storyboard: scene.storyboard },
         ...(column ? { camera: { x: W / 2, y: H / 2, zoom: fit } } : {}),
         ...(i > 0 ? { transitionIn: { type: '{{transition}}', durationFrames: 14 } } : {}),
         layers: [...(cues && sentence ? [text('caption-note', sentence, W / 2, CAPTIONS_Y - 96, { size: 30, color: '{{muted}}', align: 'center', maxWidth: 900, maxLines: 2, lh: 1.2, anims: [fade(at(frames, 0.3), 14)] })] : []),
@@ -637,7 +637,7 @@ function compileWith(spec: Explainer, options: CompileOptions, palette: Record<s
     const drawn = cues ? everything.filter(layer => layer.id !== 'caption') : everything;
     const note = sentence ? [text('caption-note', String(sentence.content), W / 2, CAPTIONS_Y - 96, { size: 30, color: '{{muted}}', align: 'center', maxWidth: 900, maxLines: 2, lh: 1.2, anims: [fade(at(frames, 0.3), 14)] })] : [];
     const picture = scene.place === 'top' || scene.kind === 'pile' || scene.kind === 'media' || scene.kind === 'freeform' ? drawn : centred(drawn, cues ? CAPTIONS_Y - (note.length ? 130 : 40) : BAND.bottom);
-    return { id: `s${i + 1}-${scene.kind}`, name: `${i + 1}. ${scene.kind}`, durationFrames: frames,
+    return { id: `s${i + 1}-${scene.kind}`, name: `${i + 1}. ${scene.kind}`, durationFrames: frames, metadata: { storyboard: scene.storyboard },
       ...(column ? { camera: { x: W / 2, y: H / 2, zoom: fit } } : {}),
       ...(i > 0 ? { transitionIn: { type: '{{transition}}', durationFrames: 14 } } : {}),
       layers: [...picture, ...note, ...(spec.chapters ? chapterBar(i, spec.scenes.length, frames) : []), ...(cues ? [captionsLayer(cues)] : []),

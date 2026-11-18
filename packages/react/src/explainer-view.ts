@@ -410,12 +410,13 @@ function code(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement {
   picks.forEach((_, k) => { if (ctx.frame >= first + k * span) current = k; });
   // The kit's editor is drawn at 14 px; zoom scales its layout (not just its paint) to a size that reads on a phone.
   return stack(ctx, [h('div', { key: 'editor', style: { zoom: 2.2 } },
-    h(CodeEditor, { filename: String(s.file ?? 'main.ts'), language: s.language ? String(s.language) : '', code: String(s.code), highlightLines: current >= 0 ? [picks[current]!] : [], delay: 2, style: { background: col(ctx, 'surface'), borderRadius: radius(ctx, 10), boxShadow: 'none', fontFamily: '"JetBrains Mono", Consolas, monospace' } })), sentence(ctx, s.caption)], 36);
+    h(CodeEditor, { filename: String(s.file ?? 'main.ts'), language: s.language ? String(s.language) : '', code: String(s.code), highlightLines: current >= 0 ? [picks[current]!] : [], delay: 2, style: { borderRadius: radius(ctx, 10), boxShadow: 'none', fontFamily: '"JetBrains Mono", Consolas, monospace' } })), sentence(ctx, s.caption)], 36);
 }
 
 const drawings: Record<string, (ctx: Ctx, scene: Record<string, any>, variant: string) => ReactElement> = { compare, chart, flow, grid, steps, timeline, stat, quote, title, closing, freeform, phone, hex, pile, media, code };
 /** Variants each scene kind knows, for `variant` in the script and for the error that lists them. */
-export const explainerVariants: Record<string, string[]> = { compare: ['split', 'stacked', 'versus'], chart: ['columns', 'rows', 'line'], flow: ['funnel', 'chain'], grid: ['board', 'spotlight'], steps: ['list', 'ladder', 'cards', 'bento'], timeline: ['spine', 'zigzag'], stat: ['hero', 'ring', 'stacked'], quote: ['card', 'pull', 'typed'], title: ['poster', 'centred'], closing: ['takeaway', 'poster'], freeform: [], phone: ['handset', 'thread'], hex: [], pile: [], media: ['frame', 'split', 'browser'], code: ['editor', 'typed'], world: [] };
+export { explainerVariants } from '../../schema/src/react-variants';
+import { explainerVariants } from '../../schema/src/react-variants';
 
 /** Pieces that come from their own module because they are large (the 3D world brings three.js): a video without such a scene never loads them. */
 export type ExplainerExtras = { World?: (props: Record<string, unknown>) => ReactElement };

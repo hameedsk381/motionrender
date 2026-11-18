@@ -40,6 +40,9 @@ Commands:
   mr explainer validate|compile <explainer.json> [--output composition.json] [--no-voice] [--voice <name>]   an explainer script (scenes + spoken lines) into a video
   mr still <composition.json> [--frame 0] [--output still.png] [--transparent] [variables]
   mr review <composition.json> [--output review.png] [--every 15] [--sheet-frames 20] [--json] [variables]   contact sheet and design checks
+  mr plan direct "brief" --react [--format 9:16] [--output explainer.json]
+  mr review <composition.json> --clips-dir checkpoints [--allow-code]
+  mr soundtrack video.mp4 --audio revised.wav --output revised.mp4
   mr render <composition.json> [--output output.mp4] [render options] [variables]
   mr render <composition.json> --batch rows.json --output "out/{{name}}.mp4" [render options]
   mr ai doctor | compose | narrate | transcribe | image | batch | studio   AI-assisted authoring; run "mr ai" for details
@@ -85,12 +88,15 @@ function renderSettings() { const concurrency=Number(option('--concurrency') ?? 
     crf: number('--crf'), bitrate: option('--bitrate'), audioBitrate: option('--audio-bitrate'), scale: number('--scale'), loudness: number('--loudness'), motionBlur: flag('--no-motion-blur') ? false : undefined }; }
 const workerToken=() => { const token=option('--token') ?? process.env.OVE_WORKER_TOKEN; if (!token) throw new Error("--workers needs the workers' token: --token T or OVE_WORKER_TOKEN"); return token; };
 async function renderVideo(composition: Composition, baseDir: string, output: string, settings: ReturnType<typeof renderSettings>) { const started=Date.now(); let lastReport=0, lastPct=-1; const isTty=Boolean(process.stdout.isTTY);
+  const cacheDirectory = option('--frame-cache'), namespace = option('--cache-namespace');
+  if (Boolean(cacheDirectory) !== Boolean(namespace)) throw new Error('Use --frame-cache DIRECTORY with --cache-namespace RENDERER_VERSION (include your font and browser revision)');
+  if (cacheDirectory && option('--workers')) throw new Error('Frame caching requires local rendering');
   const workers=option('--workers'); if (workers) { const chunkSize=option('--chunk-size') === undefined ? undefined : Number(option('--chunk-size')); if (chunkSize !== undefined && !(Number.isInteger(chunkSize) && chunkSize > 0)) throw new Error('--chunk-size must be a positive whole number of frames'); const token=workerToken();
     if (settings.format && !['mp4','webm','mov'].includes(settings.format)) throw new Error('--workers renders mp4, webm or mov');
     const result=await renderDistributed(composition, { baseDir, output, workers: workers.split(',').map(url => httpWorker(url.trim(), token)), chunkSize, frameRange: settings.frameRange, format: settings.format as 'mp4' | 'webm' | 'mov' | undefined, codec: settings.codec, transparent: settings.transparent, preset: settings.preset, crf: settings.crf, bitrate: settings.bitrate, audioBitrate: settings.audioBitrate, scale: settings.scale, loudness: settings.loudness, motionBlur: settings.motionBlur,
       onProgress: ({ rendered, total, chunk, worker }) => console.log(`Chunk ${chunk} done by ${worker} (${rendered}/${total} frames)`), onWorkerError: (worker, error) => console.log(`${worker} failed a chunk, retrying elsewhere: ${error.message.split(/\r?\n/)[0]}`) });
     console.log(`Created ${result.output} (${result.format}, ${result.frames} frames, ${result.durationSeconds.toFixed(2)} seconds; rendered in ${((Date.now()-started)/1000).toFixed(1)}s on ${workers.split(',').length} worker${workers.includes(',') ? 's' : ''})`); return; }
-  const result=await renderMedia(composition, { ...settings, baseDir, output, allowCode: flag('--allow-code'), onProgress: ({ rendered, total }) => {
+  const result=await renderMedia(composition, { ...settings, ...(cacheDirectory && namespace ? { frameCache: { directory: resolve(cacheDirectory), namespace } } : {}), baseDir, output, allowCode: flag('--allow-code'), onProgress: ({ rendered, total }) => {
     const pct=Math.floor((rendered/total)*100);
     if (isTty) {
       if (rendered === total || Date.now()-lastReport > 200) { lastReport=Date.now(); process.stdout.write(`Rendered ${rendered}/${total} (${pct}%)\r`); if (rendered === total) process.stdout.write('\n'); }
@@ -205,6 +211,12 @@ Press Ctrl+C to stop.`);
   else if (command === 'ai') { if (!file) { const { aiUsage } = await import('./ai'); console.log(aiUsage); } else process.exitCode=await (await import('./ai')).runAi(argv); }
   else if (command === 'script') await (await import('./script')).runScript(argv);
   else if (command === 'production') await (await import('./production')).runProduction(argv);
+  else if (command === 'soundtrack') {
+    const audio = option('--audio'), output = option('--output');
+    if (!file || !audio || !output) throw new Error('Usage: mr soundtrack video.mp4 --audio mix.wav --output revised.mp4');
+    await (await import('./soundtrack')).replaceSoundtrack(file, audio, output);
+    console.log(`Created ${output} with the original video stream`);
+  }
   else if (command === 'plan') await (await import('./plan')).runPlan(argv);
   else if (command === 'facts') await (await import('./facts')).runFacts(argv);
   else if (command === 'explainer') await (await import('./explainer')).runExplainer(argv);
@@ -245,7 +257,18 @@ Press Ctrl+C to stop.`);
       else if (command === 'review') { const output=resolve(option('--output') ?? 'review.png'), every=option('--every') === undefined ? undefined : Number(option('--every')), sheetOption=option('--sheet-frames') ?? option('--frames'), sheetFrames=sheetOption === undefined ? undefined : Number(sheetOption);
         if (every !== undefined && !(Number.isInteger(every) && every > 0)) throw new Error('--every must be a whole number of frames'); if (sheetFrames !== undefined && !(Number.isInteger(sheetFrames) && sheetFrames > 0 && sheetFrames <= 60)) throw new Error('--sheet-frames must be from 1 to 60');
         const result=await reviewComposition(composition, { baseDir, allowCode: flag('--allow-code'), every, sheetFrames, showSafeZones: flag('--show-safe-zones'), onProgress: (done, total) => { if (!flag('--json') && (done === total || done % 10 === 0)) process.stderr.write(`Checked ${done}/${total} frames\r`); } }); await writeFile(output, result.sheet);
-        if (flag('--json')) console.log(JSON.stringify({ sheet: output, sheetFrames: result.sheetFrames, sampledFrames: result.sampledFrames, loudness: result.loudness, issues: result.issues }, null, 2));
+        const clips: { scene: string; output: string }[] = [];
+        const clipsDir = option('--clips-dir');
+        if (clipsDir) {
+          for (const point of result.checkpoints ?? []) {
+            const clip = resolve(clipsDir, `checkpoint-${clips.length + 1}.mp4`);
+            await renderMedia(composition, { baseDir, output: clip, allowCode: flag('--allow-code'), audio: false,
+              frameRange: [point.motionFrames[0]!, point.motionFrames.at(-1)!] });
+            clips.push({ scene: point.scene, output: clip });
+            if (!flag('--json')) console.log(`Checkpoint for ${point.scene}: ${clip}`);
+          }
+        }
+        if (flag('--json')) console.log(JSON.stringify({ clips, sheet: output, sheetFrames: result.sheetFrames, checkpoints: result.checkpoints, sampledFrames: result.sampledFrames, loudness: result.loudness, issues: result.issues }, null, 2));
         else { process.stderr.write('\n'); const mark={ error: 'ERROR', warning: 'warn ', info: 'info ' }; for (const issue of result.issues) console.log(`${mark[issue.severity]}  ${issue.frame === undefined ? '' : `frame ${issue.frame} (${(issue.frame/composition.fps).toFixed(1)} s)  `}${issue.message}${issue.layer ? `  [${issue.layer}]` : ''}`);
           const count=(s: string) => result.issues.filter(i => i.severity === s).length; console.log(`${result.issues.length ? '\n' : ''}${count('error')} errors, ${count('warning')} warnings, ${count('info')} notes from ${result.sampledFrames} sampled frames${result.loudness ? `; sound ${result.loudness.integrated.toFixed(1)} LUFS, peak ${result.loudness.truePeak.toFixed(1)} dBTP` : ''}\nContact sheet: ${output} (frames ${result.sheetFrames.join(', ')})`); }
         if (result.issues.some(i => i.severity === 'error')) process.exitCode=1; }

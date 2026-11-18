@@ -11,7 +11,7 @@ export function cachedSceneFrames(renderer: Pick<Renderer, 'renderFrame' | 'conc
   const { scenes, name, id, ...globals } = composition;
   const safeLayers = (layers: any[]): boolean => layers.every(layer => primitives.has(layer.type) && (!layer.children || safeLayers(layer.children)));
   const safe = !composition.motionBlur && !scenes.some(scene => scene.transitionIn || scene.transitionOut) && !composition.assets.length;
-  const keys = new Map(scenes.filter(scene => safe && safeLayers(scene.layers)).map(scene => [scene.id, createHash('sha256').update(JSON.stringify({ namespace, globals, scene })).digest('hex')]));
+  const keys = new Map(scenes.filter(scene => safe && safeLayers(scene.layers)).map(scene => [scene.id, createHash('sha256').update(JSON.stringify({ namespace, globals, scene: { ...scene, metadata: { ...scene.metadata, storyboard: undefined } } })).digest('hex')]));
   let hits = 0, misses = 0;
   return {
     concurrency: renderer.concurrency,

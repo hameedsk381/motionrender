@@ -35,4 +35,5 @@ export * from './facts';
 export { extractJson, sanitizeCompositionJson } from './json';
 export { systemPrompt, userPrompt, planSystemPrompt, planUserPrompt, isMotionPlan, refineUserPrompt, refineOutlinePrompt, compositionOutline, refineOutlineChars, ratioName, type PromptOptions, type MotionPlan, type MotionBeat } from './prompt';
 export { directConstrainedVideo } from './constrained-director';
+export { directReactDesign } from './react-design';
 export { directDesignedVideo } from './designed-director';

@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
 import { compileVideoPlan, createReleaseManifest, diffVideoPlans, editVideoPlan, parseVideoMarkdown, planCollaborationStatus, recommendPlanAssets, recommendScenes, reviewPlanAssets, reviewVideoPlan, sceneCatalog, videoPlanSummary } from '@ove/core';
-import { createProvider, directVideoPlan, directDesignedVideo, type ProviderConfig } from '@ove/ai';
+import { createProvider, directVideoPlan, directDesignedVideo, directReactDesign, type ProviderConfig } from '@ove/ai';
 import { videoPlanSchema, type VideoPlan } from '@ove/schema';
 
 const option = (argv: string[], name: string) => { const at = argv.indexOf(name); return at < 0 ? undefined : argv[at + 1]; };
@@ -36,6 +36,19 @@ export async function runPlan(argv: string[]): Promise<number> {
     if (!Number.isFinite(duration) || duration <= 0) throw new Error('--duration must be a positive number');
     if (!Number.isInteger(fps) || fps <= 0) throw new Error('--fps must be a positive integer');
     const provider = createProvider({ provider: option(argv, '--provider'), model: option(argv, '--model'), baseUrl: option(argv, '--base-url') } satisfies ProviderConfig);
+    if (argv.includes('--react')) {
+      if (!['9:16', '16:9', '4:5', '1:1'].includes(aspect)) throw new Error('React design supports 9:16, 16:9, 4:5 and 1:1');
+      const output = resolve(option(argv, '--output') ?? 'explainer.json');
+      if (extname(output).toLowerCase() !== '.json') throw new Error('React design output must be an explainer JSON file');
+      for (const unsupported of ['--fps', '--duration', '--avoid', '--constrained']) {
+        if (argv.includes(unsupported)) throw new Error(unsupported + ' is for semantic plans. React designs use the explainer timeline.');
+      }
+      const brief = [file, option(argv, '--audience') && 'Audience: ' + option(argv, '--audience'), option(argv, '--goal') && 'Goal: ' + option(argv, '--goal')].filter(Boolean).join('\n');
+      const script = await directReactDesign(provider, brief, aspect as '16:9' | '9:16' | '1:1' | '4:5', Number(option(argv, '--max-attempts') ?? 3));
+      await writeFile(output, JSON.stringify(script, null, 2) + '\n');
+      console.log(`Wrote ${script.scenes.length} React scene designs to ${output}. Build with mr make "${output}".`);
+      return 0;
+    }
     const director = argv.includes('--constrained') ? directDesignedVideo : directVideoPlan;
     const previousPlans = await Promise.all(options(argv, '--avoid').flatMap(value => value.split(',')).map(path => readVideoPlanFile(resolve(path))));
     const directed = await director(provider, file, { previousPlans, durationSeconds: duration, width: size[0], height: size[1], fps, audience: option(argv, '--audience'), goal: option(argv, '--goal'), maxAttempts: option(argv, '--max-attempts') ? Number(option(argv, '--max-attempts')) : undefined, onProgress: message => console.log(message) });

@@ -25,7 +25,17 @@ export function compileSceneLayout(id: string, input: SceneInput, o: SceneLayout
       line('bridge', w * .08, h * .78, w * .4, 1);
     } else { line('rule', w * .08, h * .18, w * .14); type('headline', input.headline, w * .08, h * .34, w * .72, m * .12, 1); }
   } else if (input.type === 'workflow') {
-    if (input.layout === 'vertical') {
+    if (input.layout === 'branch') {
+      type('headline', input.headline, w * .08, h * .10, w * .84, m * .064);
+      type('source', input.steps[0], w * .08, h * .50, w * .26, m * .048);
+      line('feed', w * .36, h * .54, w * .12, 1);
+      add('rect', 'fork', { x: w * .48, y: h * .38, width: Math.max(3, m * .004), height: h * .32, fill: o.accent }, 1);
+      for (const [index, outcome] of input.steps.slice(1).entries()) {
+        const y = h * (.38 + index * .32);
+        line(`branch-${index}`, w * .48, y, w * .10, 2);
+        type(`outcome-${index}`, outcome, w * .61, y - m * .025, w * .32, m * .047, 2);
+      }
+    } else if (input.layout === 'vertical') {
       type('headline', input.headline, w * .08, h * .15, w * .37, m * .078);
       input.steps.forEach((step, i) => { type(`number-${i}`, `0${i + 1}`, w * .55, h * (.2 + i * .22), w * .08, m * .04, i, 'left', o.accent); type(`step-${i}`, step, w * .65, h * (.2 + i * .22), w * .27, m * .046, i); line(`stop-${i}`, w * .55, h * (.35 + i * .22), w * .36, i); });
     } else if (input.layout === 'radial') {

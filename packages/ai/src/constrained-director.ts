@@ -19,11 +19,13 @@ export async function directConstrainedVideo(provider: AiProvider, brief: string
   ];
   const inputs: SceneInput[] = []; let attempts = 0;
   for (const role of roles) {
+    const storyboard = options.story?.beats.find(beat => beat.id === role.id)?.storyboard;
     const examples = role.allowed.some(scene => scene === 'workflow' || scene === 'before-after')
       ? 'Either {"type":"workflow","headline":"A short headline","steps":["First step","Next step","Last step"]} or {"type":"before-after","before":"Old state","after":"New state"}. Each step: at most 3 words. Before/after: at most 6 words each. Use before-after only when the brief supplies both states.'
       : `{"type":"${role.allowed[0]}","headline":"A short headline"}. No other fields.`;
     const messages: ChatMessage[] = [{ role: 'system', content: `Write ONE scene input as JSON. Allowed type: ${role.allowed.join(' or ')}. Headline: at most 9 words. These word limits are mandatory. Exact shapes: ${examples} Replace example text with content from the brief. Do not repeat schema definitions. Do not produce code, positions, timing, narration, citations, or numeric performance claims. Do not invent problems, deficiencies, benefits, or services. Use positive descriptive copy grounded only in supplied facts.` }, { role: 'user', content: `Brief: ${brief}\nAudience: ${options.audience ?? 'general'}\nGoal: ${options.goal ?? 'explain the idea'}\nDesign direction: ${JSON.stringify(options.story?.design ?? {})}\nScene job: ${role.intent}\nEarlier scenes: ${JSON.stringify(inputs)}` }];
-    messages[0]!.content += ' You may add layout and choreography fields. Layout choices: kinetic-hook=editorial|poster|split; workflow=horizontal|vertical|radial; before-after=split|stacked; decisive-cta=centered|corner|banner. Choreography=reveal (together), cascade (stagger), trace (connections grow). Select the combination that serves this beat; vary spatial arrangements across the story. Do not treat a new palette as a new layout.';
+    if (storyboard) messages[1]!.content += `\nDraw this storyboard using the scene copy, layout and choreography: ${JSON.stringify(storyboard)}`;
+    messages[0]!.content += ' You may add layout and choreography fields. Layout choices: kinetic-hook=editorial|poster|split; workflow=horizontal|vertical|radial|branch (one source feeding two outcomes); before-after=split|stacked; decisive-cta=centered|corner|banner. Choreography=reveal (together), cascade (stagger), trace (connections grow). Select the combination that serves this beat; vary spatial arrangements across the story. Do not treat a new palette as a new layout.';
     if (options.story) messages[0]!.content += ' For this designed story, layout and choreography are REQUIRED on every scene input.';
     let accepted = false, last = '';
     for (let attempt = 0; attempt < limit; attempt++) {
@@ -47,7 +49,7 @@ export async function directConstrainedVideo(provider: AiProvider, brief: string
   const minimum = minimums.reduce((sum, seconds) => sum + seconds, 0), duration = options.durationSeconds ?? Math.max(15, minimum);
   if (!Number.isFinite(duration) || duration < minimum) throw new Error(`This copy needs at least ${minimum.toFixed(1)} seconds; shorten it or increase the duration`);
   const extra = (duration - minimum) / inputs.length;
-  const plan = videoPlanSchema.parse({ id: 'directed-video', name: brief.slice(0, 80), brief: { prompt: brief, audience: options.audience, goal: options.goal, targetDurationSeconds: duration }, format: { width: options.width ?? 1920, height: options.height ?? 1080, fps: options.fps ?? 30 }, beats: inputs.map((input, index) => ({ id: roles[index]!.id, intent: roles[index]!.intent, onScreen: copyFor(input), durationSeconds: minimums[index]! + extra, visual: { scene: input.type, input, direction: `Render the typed ${input.type} inputs with the standard compiler.` } })) });
+  const plan = videoPlanSchema.parse({ id: 'directed-video', name: brief.slice(0, 80), brief: { prompt: brief, audience: options.audience, goal: options.goal, targetDurationSeconds: duration }, format: { width: options.width ?? 1920, height: options.height ?? 1080, fps: options.fps ?? 30 }, beats: inputs.map((input, index) => ({ id: roles[index]!.id, intent: roles[index]!.intent, storyboard: options.story?.beats[index]?.storyboard, onScreen: copyFor(input), durationSeconds: minimums[index]! + extra, visual: { scene: input.type, input, direction: `Render the typed ${input.type} inputs with the standard compiler.` } })) });
   const directed = options.story ? videoPlanSchema.parse({ ...plan, design: options.story.design }) : plan;
   return { plan: directed, markdown: formatVideoMarkdown(directed), review: reviewVideoPlan(directed), attempts };
 }

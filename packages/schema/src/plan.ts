@@ -1,3 +1,4 @@
+import { storyboardSchema } from './storyboard';
 import { z } from 'zod';
 import { assetSchema } from './assets';
 import { contentDatumSchema, contentSchema, contentSourceSchema } from './content';
@@ -34,6 +35,7 @@ export const videoPlanVisualSchema = z.object({
 export const videoPlanBeatSchema = z.object({
   id: z.string().min(1),
   intent: z.string().min(1).describe('The communication job of this beat, such as “establish the problem” or “prove the result”.'),
+  storyboard: storyboardSchema.optional(),
   durationSeconds: z.number().positive().default(3), onScreen: z.string().optional(), narration: z.string().optional(),
   claim: z.string().optional().describe('A factual assertion this beat makes. Claims require cited sources with verified quotes.'),
   data: z.array(contentDatumSchema).default([]).describe('Figures shown in this beat, each cited to one or more sources.'),

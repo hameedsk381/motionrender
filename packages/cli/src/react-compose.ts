@@ -53,6 +53,10 @@ export async function convertToReact(raw: unknown, outputPath: string, options: 
   // top-level fields whatever the layers are. The build knows only some of them, so carry the rest across rather than lose them.
   const carried: Record<string, unknown> = {};
   for (const key of ['motionBlur', 'grain', 'texture', 'tempo']) if (composition[key] !== undefined && composition[key] !== null && !(key === 'grain' && !composition[key]) && !(key === 'texture' && composition[key].type === 'none')) carried[key] = composition[key];
+  const ranges = composition.scenes.filter((scene: any) => scene.metadata?.storyboard).map((scene: any) => ({
+    id: scene.id, startFrame: scene.startFrame, durationFrames: scene.durationFrames, storyboard: scene.metadata.storyboard,
+  }));
+  if (ranges.length) carried.storyboardRanges = ranges;
   if (Object.keys(carried).length) {
     const built = JSON.parse(await readFile(outputPath, 'utf8'));
     await writeFile(outputPath, JSON.stringify({ ...built, ...carried }, null, 2) + '\n', 'utf8');

@@ -3,9 +3,9 @@
 // colours; long stretches where nothing moves; scenes of identical length; mixed transition styles; shared text teleporting across a hard
 // cut; text on screen too briefly to read; several headlines competing; caption lines too fast to read; sounds cut off mid-phrase; and, when
 // there is sound, loudness. It also makes a contact sheet. The checks are leads for a person or agent looking at the sheet, not a verdict on taste.
-import type { Composition } from '@ove/schema'; import { createRenderer, defaultConcurrency } from '@ove/renderer'; import type { FrameReport, TextNote } from '@ove/graphics'; import { measureLoudness, sourceOf } from './audio'; import { captionTrack, measureSource } from './media'; import { layerWindows } from '@ove/timeline';
+import { storyboardSchema, type Storyboard, type Composition } from '@ove/schema'; import { createRenderer, defaultConcurrency } from '@ove/renderer'; import type { FrameReport, TextNote } from '@ove/graphics'; import { measureLoudness, sourceOf } from './audio'; import { captionTrack, measureSource } from './media'; import { layerWindows } from '@ove/timeline';
 export type ReviewIssue = { severity: 'error' | 'warning' | 'info'; code: string; message: string; frame?: number; layer?: string; suggestion?: Record<string, unknown> };
-export type ReviewResult = { scope?: 'composition-technical'; creativeQuality?: 'unassessed'; issues: ReviewIssue[]; sheet: Buffer; sheetFrames: number[]; sampledFrames: number; loudness?: { integrated: number; truePeak: number } };
+export type ReviewResult = { checkpoints?: (Storyboard & { scene: string; frame: number; motionFrames: number[] })[]; scope?: 'composition-technical'; creativeQuality?: 'unassessed'; issues: ReviewIssue[]; sheet: Buffer; sheetFrames: number[]; sampledFrames: number; loudness?: { integrated: number; truePeak: number } };
 export type ReviewRepairTask = { id: string; severity: ReviewIssue['severity']; target: { sceneId?: string; beatId?: string; layer?: string; frame?: number }; category: 'layout' | 'copy' | 'motion' | 'audio' | 'continuity' | 'style'; instruction: string; issues: ReviewIssue[] };
 export type SafeZone = { top?: number; bottom?: number; left?: number; right?: number };
 export type ReviewOptions = { allowCode?: boolean; baseDir?: string; every?: number; sheetFrames?: number; columns?: number; concurrency?: number; audio?: boolean; safeZone?: SafeZone; showSafeZones?: boolean; onProgress?: (done: number, total: number) => void };
@@ -72,6 +72,22 @@ export async function reviewComposition(composition: Composition, options: Revie
   const every=Math.max(1, Math.round(options.every ?? Math.max(fps/2, durationFrames/400))), frames: number[]=[]; for (let f=0; f < durationFrames; f+=every) frames.push(f); if (frames.at(-1) !== durationFrames-1) frames.push(durationFrames-1);
   // 20 frames by default, or one per scene for a video with more scenes than that (up to 48), so every panel of a long video is on the sheet.
   const sheetCount=Math.max(1, Math.min(options.sheetFrames ?? Math.min(48, Math.max(20, composition.scenes.filter(scene => scene.id !== 'overlay').length)), durationFrames)), sheetFrames=Array.from({ length: sheetCount }, (_, i) => Math.min(durationFrames-1, Math.round((i+0.5)*durationFrames/sheetCount)));
+  const ranges = composition.storyboardRanges ?? composition.scenes.map(scene => ({ ...scene, storyboard: scene.metadata?.storyboard }));
+  const checkpoints = ranges.flatMap(scene => {
+    const board = storyboardSchema.safeParse(scene.storyboard);
+    if (!board.success) return [];
+    const frame = scene.startFrame + Math.round(board.data.moment * (scene.durationFrames - 1));
+    const radius = Math.max(1, Math.round(fps / 4));
+    const end = Math.min(durationFrames, scene.startFrame + scene.durationFrames) - 1;
+    const motionFrames = [...new Set([Math.max(scene.startFrame, frame - radius), frame, Math.min(end, frame + radius)])];
+    return frame <= end ? [{ scene: scene.id, frame, motionFrames, ...board.data }] : [];
+  });
+  for (const frame of checkpoints.flatMap(point => point.motionFrames)) {
+    if (!frames.includes(frame)) frames.push(frame);
+    if (!sheetFrames.includes(frame)) sheetFrames.push(frame);
+  }
+  frames.sort((a, b) => a - b);
+  sheetFrames.sort((a, b) => a - b);
   const bands=safeZoneBands(width, height, options.safeZone);
   const safeBands = options.showSafeZones ? bands.map(b => ({ x0: b.x0 / width, y0: b.y0 / height, x1: b.x1 / width, y1: b.y1 / height })) : undefined;
   const renderer=await createRenderer(composition, { baseDir, concurrency: options.concurrency ?? defaultConcurrency(), scale: Math.min(1, 1280/Math.max(width, height)), allowCode: options.allowCode });
@@ -150,7 +166,7 @@ export async function reviewComposition(composition: Composition, options: Revie
     const from=l.trimStart/fps, until=from+(endFrame-startFrame)/fps*l.playbackRate, cut=measured.sounds.find(([a, b]) => a < until-0.05 && b > until+0.15);
     if (cut && endFrame < durationFrames) issues.push({ severity: 'warning', code: 'sound-cut', message: `"${l.id}" (${l.src}) is cut off mid-sound at ${seconds(endFrame, fps)}, ${(cut[1]-until).toFixed(1)} s before its phrase ends: lengthen its scene or end it at a pause`, frame: endFrame, layer: l.id }); }
   const order={ error: 0, warning: 1, info: 2 }; issues.sort((a, b) => order[a.severity]-order[b.severity] || (a.frame ?? -1)-(b.frame ?? -1));
-  return { scope: 'composition-technical', creativeQuality: 'unassessed', issues, sheet: sheet!, sheetFrames, sampledFrames: frames.length, loudness }; }
+  return { checkpoints, scope: 'composition-technical', creativeQuality: 'unassessed', issues, sheet: sheet!, sheetFrames, sampledFrames: frames.length, loudness }; }
 
 /**
  * Continuity across hard cuts: text that survives a cut should keep its place. For each scene, a text's resting spot is

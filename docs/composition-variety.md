@@ -5,7 +5,7 @@ Typed scene inputs accept optional `layout` and `choreography` fields. Design-fi
 | Scene | Layout choices |
 |---|---|
 | kinetic-hook | editorial, poster, split |
-| workflow | horizontal, vertical, radial |
+| workflow | horizontal, vertical, radial, branch (one source to two outcomes) |
 | before-after | split, stacked |
 | decisive-cta | centered, corner, banner |
 
@@ -27,3 +27,11 @@ Observed seven-frame sample results against the editorial version:
 | Palette-only control | 0.97 | 0.16 | likely repeated |
 
 These controls show sensitivity to the intended differences in this sample. They do not establish general creative diversity. Regression tests also cover palette inversion, moved content, and blank-vs-blank comparisons. The example copy is fixed deliberately: no model calls are involved in the controlled experiment.
+
+## Directing with React drawings
+
+Run `mr plan direct "your brief" --react --format 9:16 --output explainer.json`, then `mr make explainer.json --no-voice`. The React director chooses a look and storyboards from the full explainer scene catalog. It fills each selected drawing separately using its schema and supported variants. The output uses explainer timing.
+
+After building, `mr review composition.json --allow-code --clips-dir checkpoints --json` writes short silent MP4s around the planned moments and reports the scene and target frame for each. Only enable code for trusted compositions.
+
+For a soundtrack revision, use `mr soundtrack original.mp4 --audio mix.wav --output revised.mp4`. The new audio replaces the whole audio track. For local primitive renders, `mr render composition.json --frame-cache .frames --cache-namespace my-renderer-v1` enables frame reuse. Change the namespace when fonts, browser or renderer versions change. React, asset-backed scenes and transitions bypass this cache.

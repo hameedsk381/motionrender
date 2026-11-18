@@ -14,6 +14,9 @@ it('reuses unchanged primitive scene frames and invalidates edits', async () => 
     await first.renderFrame(10);
     await cachedSceneFrames(renderer, composition, directory, 'test-renderer').renderFrame(10);
     expect(calls).toBe(1);
+    composition.scenes[0]!.metadata.storyboard = { takeaway: "Revised reviewer notes" };
+    await cachedSceneFrames(renderer, composition, directory, "test-renderer").renderFrame(10);
+    expect(calls).toBe(1);
     (composition.scenes[0]!.layers[0] as any).content = 'New copy';
     await cachedSceneFrames(renderer, composition, directory, 'test-renderer').renderFrame(10);
     expect(calls).toBe(2);

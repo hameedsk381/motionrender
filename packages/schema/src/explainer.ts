@@ -2,6 +2,7 @@
 // the kind of system-design, how-it-works and "explain it simply" videos people post as reels. This is its script: what each scene
 // is about and what is said over it, with no coordinates, colours or frame numbers. A compiler (compileExplainer in @ove/core) turns
 // it into a composition, so a person, a script or an AI can write the content and the pictures stay consistent and frame-exact.
+import { storyboardSchema } from './storyboard';
 import { z } from 'zod';
 
 const words = (max: number) => z.string().trim().min(1).max(max);
@@ -9,6 +10,7 @@ const tone = z.enum(['gold', 'mint', 'red', 'muted']).describe('Colour of a labe
 const labelSchema = z.object({ text: words(28), tone: tone.default('gold') });
 
 const common = {
+  storyboard: storyboardSchema.optional(),
   step: words(48).optional().describe('The small line under the header, such as "STEP 1 · UPDATES → SERVER". Upper case reads best.'),
   say: words(420).optional().describe('What is said over this scene. The scene lasts as long as the line, so write it as speech: short sentences, one idea.'),
   layout: z.enum([...explainerLayouts, 'auto']).optional().describe('This scene\'s own layout, instead of the video\'s: card (centred, boxed), editorial (flush left, hairline rules; title, stat, steps and closing scenes) or auto (editorial when the scene carries a lot of text, card when it is short and punchy). Mix them on purpose, for example an editorial title and card diagrams.'),

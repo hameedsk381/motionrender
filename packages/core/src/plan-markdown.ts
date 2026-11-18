@@ -21,7 +21,10 @@ export function parseVideoMarkdown(markdown: string): VideoPlan {
   const beats = headings.map((heading, index) => {
     const data = fields(heading[2]!);
     const visual = { ...(data['scene-input'] ? { input: JSON.parse(data['scene-input']) } : {}), ...(data.visual ? { direction: data.visual } : {}), ...(data.scene ? { scene: data.scene } : {}), ...(data.asset ? { asset: data.asset } : {}), ...(data.module ? { module: data.module } : {}), ...(data.transition ? { transition: data.transition } : {}), ...(data['media-fit'] ? { fit: data['media-fit'] } : {}) };
-    return { id: data.id ?? (heading[1]!.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `beat-${index + 1}`), intent: data.intent ?? heading[1]!, durationSeconds: seconds(data.duration ?? '') ?? 3, onScreen: data['on-screen'], narration: data.narration, claim: data.claim, sourceIds: data.source ? data.source.split(',').map(value).filter(Boolean) : [], visual };
+    const storyboard = ['visible', 'change', 'takeaway', 'moment'].some(key => key in data)
+      ? { visible: data.visible, change: data.change, takeaway: data.takeaway, moment: data.moment?.trim() ? Number(data.moment) : undefined }
+      : undefined;
+    return { storyboard, id: data.id ?? (heading[1]!.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `beat-${index + 1}`), intent: data.intent ?? heading[1]!, durationSeconds: seconds(data.duration ?? '') ?? 3, onScreen: data['on-screen'], narration: data.narration, claim: data.claim, sourceIds: data.source ? data.source.split(',').map(value).filter(Boolean) : [], visual };
   });
   const variables = Object.fromEntries(variableLines.map(match => {
     const type = match[2]!, raw = match[3] ? value(match[3]!) : undefined;
@@ -44,7 +47,7 @@ export function formatVideoMarkdown(input: VideoPlan | unknown): string {
   if (Object.keys(plan.variables).length) lines.push('');
   for (const source of plan.sources) lines.push(`> Source [${source.id}]: ${source.url ?? source.title ?? ''}${source.quote ? ` | ${source.quote}` : ''}`);
   if (plan.sources.length) lines.push('');
-  for (const beat of plan.beats) lines.push(`# ${beat.intent}`, `ID: ${beat.id}`, `Duration: ${beat.durationSeconds}s`, ...(beat.onScreen ? [`On-screen: ${beat.onScreen}`] : []), ...(beat.narration ? [`Narration: ${beat.narration}`] : []), ...(beat.claim ? [`Claim: ${beat.claim}`] : []), ...(beat.sourceIds.length ? [`Source: ${beat.sourceIds.join(', ')}`] : []), ...(beat.visual.scene ? [`Scene: ${beat.visual.scene}`] : []), ...(beat.visual.direction ? [`Visual: ${beat.visual.direction}`] : []), ...(beat.visual.asset ? [`Asset: ${beat.visual.asset}`] : []), ...(beat.visual.module ? [`Module: ${beat.visual.module}`] : []), ...(beat.visual.transition !== 'cut' ? [`Transition: ${beat.visual.transition}`] : []), '');
+  for (const beat of plan.beats) lines.push(`# ${beat.intent}`, `ID: ${beat.id}`, `Duration: ${beat.durationSeconds}s`, ...(beat.storyboard ? [`Visible: ${beat.storyboard.visible}`, `Change: ${beat.storyboard.change}`, `Takeaway: ${beat.storyboard.takeaway}`, `Moment: ${beat.storyboard.moment}`] : []), ...(beat.onScreen ? [`On-screen: ${beat.onScreen}`] : []), ...(beat.narration ? [`Narration: ${beat.narration}`] : []), ...(beat.claim ? [`Claim: ${beat.claim}`] : []), ...(beat.sourceIds.length ? [`Source: ${beat.sourceIds.join(', ')}`] : []), ...(beat.visual.scene ? [`Scene: ${beat.visual.scene}`] : []), ...(beat.visual.direction ? [`Visual: ${beat.visual.direction}`] : []), ...(beat.visual.asset ? [`Asset: ${beat.visual.asset}`] : []), ...(beat.visual.module ? [`Module: ${beat.visual.module}`] : []), ...(beat.visual.transition !== 'cut' ? [`Transition: ${beat.visual.transition}`] : []), '');
   for (const beat of plan.beats) if (beat.visual.input) {
     const index = lines.indexOf(`ID: ${beat.id}`);
     lines.splice(index + 1, 0, `Scene-input: ${JSON.stringify(beat.visual.input)}`);
