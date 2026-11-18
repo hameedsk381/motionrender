@@ -4,6 +4,8 @@ All notable changes to MotionRender (formerly Open Video Engine). The published 
 
 ## Unreleased
 
+## 0.8.0 (2026-11-18)
+
 ### Semantic authoring and constrained generation
 - Added portable video plans, Markdown authoring, semantic scene compilation, asset recommendations, collaboration status, release manifests and CLI/MCP plan tools.
 - Added a constrained director for small models: typed scene inputs, per-scene validation and retries, and compiler-owned reading-time budgets.
