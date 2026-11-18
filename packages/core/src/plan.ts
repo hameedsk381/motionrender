@@ -1,4 +1,4 @@
-import { productionSchema, type Production, type VideoPlan, type VideoPlanEdit, videoPlanEditsSchema, videoPlanSchema } from '@ove/schema';
+import { parseComposition, productionSchema, type Production, type VideoPlan, type VideoPlanEdit, videoPlanEditsSchema, videoPlanSchema } from '@ove/schema';
 import { compileProduction, type CompiledProduction } from './production';
 import { sceneCatalog } from './scene-catalog';
 import { compileSemanticScene } from './scene-compiler';
@@ -30,10 +30,11 @@ export function compileVideoPlan(input: VideoPlan | unknown): CompiledProduction
   compiled.composition.variables = plan.variables;
   const palette = plan.style?.palette ?? {}, sceneOptions = { width: compiled.composition.width, height: compiled.composition.height, font: plan.style?.fonts?.display ?? 'Inter', ink: palette.text ?? '#f4f1ea', muted: palette.muted ?? '#9aa6c4', accent: palette.accent ?? '#22d3ee', surface: palette.surface ?? '#151c33' };
   for (const beat of plan.beats) {
+    const act = plan.design?.acts.find(candidate => candidate.beatIds.includes(beat.id));
     if (!beat.visual.scene || beat.visual.module) continue;
     const scene = compiled.composition.scenes.find(candidate => candidate.id === beat.id);
     if (!scene) continue;
-    const visual = compileSemanticScene(beat, { ...sceneOptions, durationFrames: scene.durationFrames });
+    const visual = compileSemanticScene(beat, { ...sceneOptions, ...(act ? { ink: act.ink, muted: act.ink, surface: act.surface ?? act.field, accent: act.accent ?? sceneOptions.accent } : {}), ...(plan.design ? { font: plan.design.typography.display } : {}), durationFrames: scene.durationFrames });
     if (!visual) continue;
     const audio = scene.layers.filter((layer: any) => layer.type === 'audio');
     // A selected semantic scene owns its primitive layers. Footage is deliberately retained as a background when present.
@@ -50,11 +51,16 @@ export function compileVideoPlan(input: VideoPlan | unknown): CompiledProduction
     // A module owns the visual scene; audio remains an ordinary composition layer so the existing mixer and review pipeline stay authoritative.
     const audio = scene.layers.filter((layer: any) => layer.type === 'audio');
     scene.layers = [{ id: `module:${beat.id}`, type: 'react', src: module.src, x: 0, y: 0, width: compiled.composition.width, height: compiled.composition.height,
-      durationInFrames: scene.durationFrames, props: { ...module.props, ...beat.visual.props, beat: { id: beat.id, intent: beat.intent, onScreen: beat.onScreen ?? beat.intent, narration: beat.narration }, assets }, resolution: module.resolution, startFrame: 0, endFrame: scene.durationFrames,
+      durationInFrames: scene.durationFrames, props: { ...module.props, ...beat.visual.props, ...(plan.design ? { design: plan.design } : {}), beat: { id: beat.id, intent: beat.intent, onScreen: beat.onScreen ?? beat.intent, narration: beat.narration }, assets }, resolution: module.resolution, startFrame: 0, endFrame: scene.durationFrames,
       opacity: 1, rotation: 0, scale: 1, scaleX: 1, scaleY: 1, originX: 0, originY: 0, zIndex: 0, visible: true, fixed: false, animations: [], blur: 0, blendMode: 'normal' } as any, ...audio];
     scene.assetIds = [...new Set([...scene.assetIds, ...module.assets])];
     compiled.notes.push(`Beat "${beat.id}" uses React scene module "${module.id}"; render with --allow-code only after trusting ${module.src}.`);
   }
+  for (const act of plan.design?.acts ?? []) for (const id of act.beatIds) {
+    const scene = compiled.composition.scenes.find(candidate => candidate.id === id)!;
+    scene.layers.unshift({ id: `design-field:${id}`, type: 'rect', x: 0, y: 0, width: compiled.composition.width, height: compiled.composition.height, fill: act.field, startFrame: 0, endFrame: scene.durationFrames, zIndex: -1000 } as any);
+  }
+  compiled.composition = parseComposition(compiled.composition);
   return { ...compiled, production };
 }
 

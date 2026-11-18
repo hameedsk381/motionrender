@@ -7,6 +7,7 @@ import { SceneProps } from './SceneProps';
 import { PlanPreview } from './PlanPreview';
 import { SceneCatalog } from './SceneCatalog';
 import { ReferenceVideo } from './ReferenceVideo';
+import { DesignHandoff } from './DesignHandoff';
 
 const scenes = ['kinetic-hook', 'before-after', 'proof-stat', 'workflow', 'comparison-grid', 'feature-bento', 'decisive-cta'];
 const clone = <T,>(value: T): T => structuredClone(value);
@@ -56,6 +57,7 @@ export function SemanticPlan({ id }: { id: string }) {
         <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{plan.beats.map((beat: any, index: number) => <article className="card" style={{ padding: 15 }} key={beat.id}><div className="row"><b>{String(index + 1).padStart(2, '0')}</b><input aria-label="Beat id" value={beat.id} onChange={e => change(next => { next.beats[index].id = e.target.value; })} /><span className="grow" /><Button size="sm" variant="ghost" onClick={() => change(next => next.beats.splice(index, 1))} disabled={plan.beats.length === 1}>Remove</Button></div><div className="form-grid" style={{ marginTop: 10 }}><Field label="Intent"><input value={beat.intent} onChange={e => change(next => { next.beats[index].intent = e.target.value; })} /></Field><Field label="Scene pattern"><select value={beat.visual?.scene ?? ''} onChange={e => change(next => { next.beats[index].visual.scene = e.target.value || undefined; })}>{scenes.map(scene => <option key={scene}>{scene}</option>)}</select></Field></div><Field label="On-screen copy"><input value={beat.onScreen ?? ''} onChange={e => change(next => { next.beats[index].onScreen = e.target.value || undefined; })} /></Field><div className="form-grid"><Field label="Narration"><input value={beat.narration ?? ''} onChange={e => change(next => { next.beats[index].narration = e.target.value || undefined; })} /></Field><Field label="Seconds"><input type="number" min="1" step="0.5" value={beat.durationSeconds} onChange={e => change(next => { next.beats[index].durationSeconds = Number(e.target.value); })} /></Field></div>{state?.assets?.[beat.id]?.length ? <small className="sub">Asset matches: {state.assets[beat.id].map((asset: any) => asset.assetId).join(', ')}</small> : null}</article>)}</div>
       </section>
       <aside style={{ display: 'grid', gap: 14 }}>
+        <DesignHandoff design={plan.design} beatIds={plan.beats.map((beat: any) => beat.id)} onChange={design => change(next => { next.design = design; })} />
         <label className="row"><input type="checkbox" checked={livePreview} onChange={event => setLivePreview(event.target.checked)} /> Update preview while editing</label>
         <ReferenceVideo project={id} onNote={note => change(next => { next.comments = [...(next.comments ?? []), { id: crypto.randomUUID(), body: note, createdAt: new Date().toISOString() }]; })} />
         <SceneCatalog beats={plan.beats} onSelect={(beatId, sceneId) => change(next => { const beat = next.beats.find((item: any) => item.id === beatId); beat.visual.scene = sceneId; beat.visual.module = undefined; })} />

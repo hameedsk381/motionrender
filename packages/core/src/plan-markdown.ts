@@ -31,7 +31,7 @@ export function parseVideoMarkdown(markdown: string): VideoPlan {
   return videoPlanSchema.parse({ version: '1.0', kind: 'video-plan', id: meta.id ?? title.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name: title,
     brief: { prompt: meta.prompt ?? meta.goal ?? title, audience: meta.audience, goal: meta.goal, targetDurationSeconds: seconds(meta.duration ?? '') },
     format: { width: format?.[0] ?? (Number(meta.width) || 1920), height: format?.[1] ?? (Number(meta.height) || 1080), fps: Number(meta.fps) || 30 }, variables,
-    sources: sourceLines.map(match => ({ id: match[1]!, url: value(match[2]!), quote: match[3] ? value(match[3]!) : undefined })), beats,
+    ...(meta.design ? { design: JSON.parse(meta.design) } : {}), sources: sourceLines.map(match => ({ id: match[1]!, url: value(match[2]!), quote: match[3] ? value(match[3]!) : undefined })), beats,
   });
 }
 
@@ -40,6 +40,7 @@ export function formatVideoMarkdown(input: VideoPlan | unknown): string {
   const plan = videoPlanSchema.parse(input), ratio = Object.entries(standardFormats).find(([, size]) => size[0] === plan.format.width && size[1] === plan.format.height)?.[0];
   const lines = ['---', `id: ${plan.id}`, `title: ${plan.name}`, `format: ${ratio ?? `${plan.format.width}x${plan.format.height}`}`, `fps: ${plan.format.fps}`, `prompt: ${plan.brief.prompt}`, ...(plan.brief.audience ? [`audience: ${plan.brief.audience}`] : []), ...(plan.brief.goal ? [`goal: ${plan.brief.goal}`] : []), ...(plan.brief.targetDurationSeconds ? [`duration: ${plan.brief.targetDurationSeconds}s`] : []), '---', ''];
   for (const [name, declaration] of Object.entries(plan.variables)) lines.push(`> Variable ${name}: ${declaration.type}${declaration.default === undefined ? '' : ` = ${declaration.default}`}`);
+  if (plan.design) lines.splice(2, 0, `design: ${JSON.stringify(plan.design)}`);
   if (Object.keys(plan.variables).length) lines.push('');
   for (const source of plan.sources) lines.push(`> Source [${source.id}]: ${source.url ?? source.title ?? ''}${source.quote ? ` | ${source.quote}` : ''}`);
   if (plan.sources.length) lines.push('');

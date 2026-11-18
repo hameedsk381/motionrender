@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
 import { compileVideoPlan, createReleaseManifest, diffVideoPlans, editVideoPlan, parseVideoMarkdown, planCollaborationStatus, recommendPlanAssets, recommendScenes, reviewPlanAssets, reviewVideoPlan, sceneCatalog, videoPlanSummary } from '@ove/core';
-import { createProvider, directVideoPlan, directConstrainedVideo, type ProviderConfig } from '@ove/ai';
+import { createProvider, directVideoPlan, directDesignedVideo, type ProviderConfig } from '@ove/ai';
 import { videoPlanSchema, type VideoPlan } from '@ove/schema';
 
 const option = (argv: string[], name: string) => { const at = argv.indexOf(name); return at < 0 ? undefined : argv[at + 1]; };
@@ -36,8 +36,9 @@ export async function runPlan(argv: string[]): Promise<number> {
     if (!Number.isFinite(duration) || duration <= 0) throw new Error('--duration must be a positive number');
     if (!Number.isInteger(fps) || fps <= 0) throw new Error('--fps must be a positive integer');
     const provider = createProvider({ provider: option(argv, '--provider'), model: option(argv, '--model'), baseUrl: option(argv, '--base-url') } satisfies ProviderConfig);
-    const director = argv.includes('--constrained') ? directConstrainedVideo : directVideoPlan;
-    const directed = await director(provider, file, { durationSeconds: duration, width: size[0], height: size[1], fps, audience: option(argv, '--audience'), goal: option(argv, '--goal'), maxAttempts: option(argv, '--max-attempts') ? Number(option(argv, '--max-attempts')) : undefined, onProgress: message => console.log(message) });
+    const director = argv.includes('--constrained') ? directDesignedVideo : directVideoPlan;
+    const previousPlans = await Promise.all(options(argv, '--avoid').flatMap(value => value.split(',')).map(path => readVideoPlanFile(resolve(path))));
+    const directed = await director(provider, file, { previousPlans, durationSeconds: duration, width: size[0], height: size[1], fps, audience: option(argv, '--audience'), goal: option(argv, '--goal'), maxAttempts: option(argv, '--max-attempts') ? Number(option(argv, '--max-attempts')) : undefined, onProgress: message => console.log(message) });
     const output = resolve(option(argv, '--output') ?? 'video.md');
     await writeFile(output, directed.markdown);
     console.log(`Wrote reviewed semantic plan to ${output} (${directed.plan.beats.length} beats; ${directed.attempts} director attempt${directed.attempts === 1 ? '' : 's'}).`);

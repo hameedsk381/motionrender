@@ -5,7 +5,7 @@
 // there is sound, loudness. It also makes a contact sheet. The checks are leads for a person or agent looking at the sheet, not a verdict on taste.
 import type { Composition } from '@ove/schema'; import { createRenderer, defaultConcurrency } from '@ove/renderer'; import type { FrameReport, TextNote } from '@ove/graphics'; import { measureLoudness, sourceOf } from './audio'; import { captionTrack, measureSource } from './media'; import { layerWindows } from '@ove/timeline';
 export type ReviewIssue = { severity: 'error' | 'warning' | 'info'; code: string; message: string; frame?: number; layer?: string; suggestion?: Record<string, unknown> };
-export type ReviewResult = { issues: ReviewIssue[]; sheet: Buffer; sheetFrames: number[]; sampledFrames: number; loudness?: { integrated: number; truePeak: number } };
+export type ReviewResult = { scope?: 'composition-technical'; creativeQuality?: 'unassessed'; issues: ReviewIssue[]; sheet: Buffer; sheetFrames: number[]; sampledFrames: number; loudness?: { integrated: number; truePeak: number } };
 export type ReviewRepairTask = { id: string; severity: ReviewIssue['severity']; target: { sceneId?: string; beatId?: string; layer?: string; frame?: number }; category: 'layout' | 'copy' | 'motion' | 'audio' | 'continuity' | 'style'; instruction: string; issues: ReviewIssue[] };
 export type SafeZone = { top?: number; bottom?: number; left?: number; right?: number };
 export type ReviewOptions = { allowCode?: boolean; baseDir?: string; every?: number; sheetFrames?: number; columns?: number; concurrency?: number; audio?: boolean; safeZone?: SafeZone; showSafeZones?: boolean; onProgress?: (done: number, total: number) => void };
@@ -14,7 +14,7 @@ const area = (a: TextNote) => Math.max(0, a.x1 - a.x0) * Math.max(0, a.y1 - a.y0
 type Rect = { x0: number; y0: number; x1: number; y1: number };
 const overlap = (a: Rect, b: Rect) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
 const seconds = (frame: number, fps: number) => `${(frame/fps).toFixed(1)} s`;
-const visible = (t: TextNote) => t.alpha >= 0.95;
+const visible = (t: TextNote) => t.alpha >= 0.95 && !t.occluded;
 
 export type SafeZoneBand = { name: string; hint: string; x0: number; y0: number; x1: number; y1: number };
 /**
@@ -88,6 +88,8 @@ export async function reviewComposition(composition: Composition, options: Revie
   // tiny sizes and over each other on purpose.
   const hold=Math.max(2, Math.ceil(fps/every)+1), margin=0.01*minSide, smallest=minSide*0.018;
   persistent('text-cut', 1, t => t.truncated ? `"${t.text}" is cut short with "…": give it more room (maxWidth/maxLines) or a minFontSize` : undefined, 'error');
+  persistent('dom-clip', hold, t => visible(t) && t.clipped ? `"${t.text}" is clipped by a React text container` : undefined, 'error');
+  persistent('contrast', hold, t => visible(t) && t.contrast !== undefined && t.contrast < (t.size >= minSide * .024 ? 3 : 4.5) ? `"${t.text}" has ${t.contrast.toFixed(2)}:1 contrast against its solid DOM background` : undefined, 'warning');
   persistent('off-frame', hold, t => visible(t) && (t.x0 < -margin || t.y0 < -margin || t.x1 > width+margin || t.y1 > height+margin) ? `"${t.text}" runs off the frame` : undefined, 'error');
   persistent('small-text', hold, t => visible(t) && t.size < smallest ? `"${t.text}" is ${Math.round(t.size)} px, too small to read on a phone (labels ${Math.ceil(smallest)}+ px, body ${Math.round(minSide*0.024)}+ px)` : undefined, 'warning');
   persistent('overlap', hold, (t, report) => { if (!visible(t)) return; const other=report.texts.find(o => o !== t && o.id !== t.id && visible(o) && overlap(t, o) > 0.15*Math.min(area(t), area(o)) && (t.kind === 'captions' || o.kind === 'captions' || t.id < o.id));
@@ -148,7 +150,7 @@ export async function reviewComposition(composition: Composition, options: Revie
     const from=l.trimStart/fps, until=from+(endFrame-startFrame)/fps*l.playbackRate, cut=measured.sounds.find(([a, b]) => a < until-0.05 && b > until+0.15);
     if (cut && endFrame < durationFrames) issues.push({ severity: 'warning', code: 'sound-cut', message: `"${l.id}" (${l.src}) is cut off mid-sound at ${seconds(endFrame, fps)}, ${(cut[1]-until).toFixed(1)} s before its phrase ends: lengthen its scene or end it at a pause`, frame: endFrame, layer: l.id }); }
   const order={ error: 0, warning: 1, info: 2 }; issues.sort((a, b) => order[a.severity]-order[b.severity] || (a.frame ?? -1)-(b.frame ?? -1));
-  return { issues, sheet: sheet!, sheetFrames, sampledFrames: frames.length, loudness }; }
+  return { scope: 'composition-technical', creativeQuality: 'unassessed', issues, sheet: sheet!, sheetFrames, sampledFrames: frames.length, loudness }; }
 
 /**
  * Continuity across hard cuts: text that survives a cut should keep its place. For each scene, a text's resting spot is

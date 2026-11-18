@@ -4,6 +4,19 @@ All notable changes to MotionRender (formerly Open Video Engine). The published 
 
 ## Unreleased
 
+## 0.9.0 (2026-11-18)
+
+### Added
+- Design handoffs with concepts, metaphors, typography, narrative acts and act-specific colors; Studio editing and design-first constrained direction.
+- Eleven typed scene arrangements with reveal, cascade and trace choreography, plus structural and sampled rendered repetition comparisons.
+- React DOM text inspection, clipping, solid-background contrast and conservative opaque-sibling occlusion checks.
+- Encoded-deliverable checks for black intervals, frozen frames, expected audio and duration. Technical reports explicitly leave creative quality unassessed.
+- Reproducible model-evaluation and controlled composition-comparison scripts.
+
+### Fixed
+- Critique approval now requires a high score, explicit approval, no unresolved findings and all requested frame labels.
+- Benchmark readability uses issue codes; generated semantic layers receive schema defaults without resolving template variables early.
+
 ## 0.8.0 (2026-11-18)
 
 ### Semantic authoring and constrained generation

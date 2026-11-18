@@ -4,6 +4,7 @@ import { contentDatumSchema, contentSchema, contentSourceSchema } from './conten
 import { variablesSchema } from './variables';
 import { productionApprovalSchema, productionStyleSchema } from './production';
 import { sceneInputSchema } from './scene-input';
+import { designHandoffSchema } from './design-handoff';
 
 const source = z.string().min(1);
 export const videoPlanCommentSchema = z.object({
@@ -45,6 +46,7 @@ export const videoPlanSchema = z.object({
   version: z.literal('1.0').default('1.0'),
   kind: z.literal('video-plan').default('video-plan'),
   id: z.string().min(1), name: z.string().min(1),
+  design: designHandoffSchema.optional(),
   brief: z.object({ prompt: z.string().min(1), audience: z.string().optional(), goal: z.string().optional(), targetDurationSeconds: z.number().positive().optional() }),
   format: z.object({ width: z.number().int().positive().default(1920), height: z.number().int().positive().default(1080), fps: z.number().int().positive().max(240).default(30) }).default({ width: 1920, height: 1080, fps: 30 }),
   style: productionStyleSchema.optional(), approvals: z.array(productionApprovalSchema).default([]).describe('Current state of script, characters, storyboard, preview, and final checkpoints.'), approvalHistory: z.array(approvalHistorySchema).default([]).describe('Append-only approval decisions, including who made each decision.'), comments: z.array(videoPlanCommentSchema).default([]).describe('Shared plan and beat comments.'), variables: variablesSchema.default({}).describe('Typed personalization inputs, used as {{name}} in plan copy and passed through to batch rendering.'), assets: z.array(assetSchema).default([]), sources: z.array(contentSourceSchema).default([]).describe('Evidence behind factual beats; cited sources need a verified quote.'), sceneModules: z.array(sceneModuleSchema).default([]),
@@ -68,6 +70,18 @@ export const videoPlanSchema = z.object({
     if (type && beat.visual.media === 'video' && type !== 'video') ctx.addIssue({ code: 'custom', path: ['beats', index, 'visual', 'asset'], message: `Beat "${beat.id}" asks for video but asset "${asset}" is ${type}` });
   }
   const commentIds = new Set<string>();
+  if (plan.design) {
+    const assigned = new Set<string>(), acts = new Set<string>();
+    for (const [index, act] of plan.design.acts.entries()) {
+      if (acts.has(act.id)) ctx.addIssue({ code: 'custom', path: ['design', 'acts', index, 'id'], message: 'Act IDs must be unique' });
+      acts.add(act.id);
+      for (const id of act.beatIds) {
+        if (!ids.has(id) || assigned.has(id)) ctx.addIssue({ code: 'custom', path: ['design', 'acts', index, 'beatIds'], message: `Beat "${id}" is unknown or assigned more than once` });
+        assigned.add(id);
+      }
+    }
+    for (const id of ids) if (!assigned.has(id)) ctx.addIssue({ code: 'custom', path: ['design', 'acts'], message: `Beat "${id}" needs a narrative act` });
+  }
   for (const [index, comment] of plan.comments.entries()) {
     if (commentIds.has(comment.id)) ctx.addIssue({ code: 'custom', path: ['comments', index, 'id'], message: `Comment id "${comment.id}" is used twice` });
     commentIds.add(comment.id);

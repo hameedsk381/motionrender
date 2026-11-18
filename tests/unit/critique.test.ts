@@ -32,13 +32,19 @@ describe('readCritique', () => {
     expect(readCritique(reply({ score: 'high' }), frameLabels).problems[0]).toContain('"score"');
   });
 
-  it('is ready when there is nothing to fix, or when it says so with a high score', () => {
-    expect(readCritique(reply({ problems: [], score: 4, ready: false }), frameLabels).critique!.ready).toBe(true);
-    expect(readCritique(reply({ score: 9, ready: true }), frameLabels).critique!.ready).toBe(true);
+  it('requires explicit approval, a high score, and no unresolved problems', () => {
+    expect(readCritique(reply({ problems: [], score: 4, ready: false }), frameLabels).critique!.ready).toBe(false);
+    expect(readCritique(reply({ score: 9, ready: true }), frameLabels).critique!.ready).toBe(false);
+    expect(readCritique(reply({ problems: [], score: 9, ready: true }), frameLabels).critique!.ready).toBe(true);
     // A high score alone is not approval while problems are listed.
     expect(readCritique(reply({ score: 9, ready: false }), frameLabels).critique!.ready).toBe(false);
     // Saying ready with a low score is not approval either.
     expect(readCritique(reply({ score: 6, ready: true }), frameLabels).critique!.ready).toBe(false);
+  });
+
+  it('rejects invented or duplicate frame labels', () => {
+    expect(readCritique(reply({ frames: seen.map(entry => ({ ...entry, label: 'unrequested' })) }), frameLabels).critique).toBeUndefined();
+    expect(readCritique(reply({ frames: [seen[0], seen[0]] }), frameLabels).critique).toBeUndefined();
   });
 
   it('keeps the four most important problems and clamps the score', () => {

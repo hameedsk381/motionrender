@@ -2,7 +2,9 @@
 
 Use `mr plan direct "Explain how a shared inbox routes requests" --constrained --duration 15 --output video.md`, then `mr make video.md --draft`.
 
-The constrained path supports a three-beat product explainer: hook, workflow or before/after, and call to action. Each call produces only one typed scene input. Failed calls retry that scene with validation feedback, with a bounded attempt limit. The application owns IDs, layout, motion, transitions, and reading-time budgets. Inputs survive Markdown round trips using `Scene-input:` JSON records.
+The CLI constrained path now calls `directDesignedVideo`: it first generates a design handoff and 2–6 beats with chosen IDs, purposes and scene kinds. The handoff maps every beat to a narrative act. Scene inputs are then produced independently with validation and bounded retries. Layout remains limited to the implemented primitives; a creative concept is not automatically realized merely because it appears in the handoff. Inputs survive Markdown round trips using `Scene-input:` JSON records. The lower-level `directConstrainedVideo` remains available for supplied stories and legacy three-beat callers.
+
+Pass `--avoid previous-video.md` (repeat the option or use comma-separated paths) to provide previous directions. A scene-sequence similarity warning catches palette/copy-only variants. It is a structural signal, not a visual or aesthetic score. Studio's semantic plan workspace can edit design concepts, motifs, typography and narrative acts.
 
 Contracts bound headline length and require exactly three short workflow labels or two contrast labels. Extra properties, executable code fields, and scene/input mismatches fail validation. The compiler consumes the labels directly rather than interpreting prose to reconstruct a diagram.
 

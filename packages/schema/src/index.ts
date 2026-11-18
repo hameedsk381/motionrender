@@ -303,3 +303,4 @@ export const compositionJsonSchema = z.toJSONSchema(compositionSchema, { target:
 // Readable text for any error, used by the CLI and the preview: validation problems become one "✖ message → at path" line each.
 export const describeError = (error: unknown): string => error instanceof z.ZodError ? z.prettifyError(error) : error instanceof Error ? error.message : String(error);
 export { sceneInputSchema, sceneInputJsonSchema, type SceneInput } from './scene-input';
+export { designHandoffSchema, type DesignHandoff } from './design-handoff';

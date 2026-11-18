@@ -16,6 +16,7 @@ it('compiles typed workflow labels and preserves inputs through Markdown', async
   const roundtrip = parseVideoMarkdown(result.markdown);
   expect(roundtrip.beats.map(beat => beat.visual.input)).toEqual(result.plan.beats.map(beat => beat.visual.input));
   const composition = compileVideoPlan(roundtrip).composition;
+  expect(composition.scenes[0]!.layers.every(layer => layer.visible && layer.opacity > 0)).toBe(true);
   const labels = composition.scenes[1]!.layers.filter((layer: any) => layer.id.includes('node-copy')).map((layer: any) => layer.content);
   expect(labels).toEqual(['Receive', 'Assign', 'Resolve']);
   expect(composition.durationFrames).toBe(450);

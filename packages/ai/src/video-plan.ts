@@ -2,10 +2,13 @@
 // then validates and reviews that plan before handing it to the deterministic compiler.
 import { formatVideoMarkdown, reviewVideoPlan, sceneCatalogMarkdown, type VideoPlanReviewIssue } from '@ove/core';
 import { videoPlanSchema, type VideoPlan } from '@ove/schema';
+import type { DesignHandoff, SceneInput } from '@ove/schema';
 import { extractJson } from './json';
 import type { AiProvider, ChatMessage } from './providers';
 
 export type DirectVideoPlanOptions = {
+  story?: { design: DesignHandoff; beats: { id: string; intent: string; scene: SceneInput['type'] }[] };
+  previousPlans?: VideoPlan[];
   durationSeconds?: number;
   width?: number;
   height?: number;

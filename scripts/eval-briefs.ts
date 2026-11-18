@@ -134,7 +134,8 @@ export function scoreRun(run: RunRecord, brief: Brief): Score {
   check('duration', durationSeconds !== undefined && Math.abs(durationSeconds - brief.durationSeconds) <= 0.5,
     `${durationSeconds === undefined ? 'unknown' : durationSeconds} s vs ${brief.durationSeconds} s wanted${run.fileSeconds ? ' (probed)' : ''}`);
   check('resolution', run.width === brief.width && run.height === brief.height, run.width === undefined ? 'no composition' : `${run.width}x${run.height}`);
-  const textProblem = (run.reviewMessages ?? []).some(message => /off the frame|too brief|cut off|too small|overlapping|unreadable/.test(message));
+  const textCodes = new Set(['text-cut', 'off-frame', 'small-text', 'overlap', 'safe-zone', 'read-time', 'headlines', 'caption-flash', 'caption-speed', 'dom-clip', 'contrast']);
+  const textProblem = (run.reviewWarnings ?? []).some(code => textCodes.has(code)) || (run.reviewMessages ?? []).some(message => /off the frame|too brief|cut off|too small|overlap|unreadable/.test(message));
   check('copy readable', run.reviewErrors === 0 && !textProblem, run.reviewErrors === undefined ? 'review did not run' : `${run.reviewErrors} error${run.reviewErrors === 1 ? '' : 's'}${run.reviewWarnings?.length ? `, warnings: ${run.reviewWarnings.join(', ')}` : ', clean'}`);
   check('picture moves', !!run.reviewWarnings && !run.reviewWarnings.includes('frozen'), run.reviewWarnings === undefined ? 'review did not run' : run.reviewWarnings?.includes('frozen') ? 'frozen stretches reported' : 'no frozen stretch');
   const failed = Object.entries(checks).filter(([, value]) => !value.pass).map(([name]) => name);

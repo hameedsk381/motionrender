@@ -48,6 +48,8 @@ export function readCritique(reply: unknown, labels: string[]): { critique?: Cri
     .filter((entry: { label: string; seen: string }) => entry.label && entry.seen.split(' ').length >= 3);
   if (!seen.length) return { problems: ['"frames" must say, for each frame, what is literally on screen (at least a short sentence)'] };
   if (labels.length > 1 && seen.length < Math.ceil(labels.length / 2)) return { problems: [`"frames" describes ${seen.length} of ${labels.length} frames; describe what is on screen in each`] };
+  const expected = new Set(labels), observed = new Set(seen.map((entry: { label: string }) => entry.label));
+  if (seen.length !== observed.size || seen.some((entry: { label: string }) => !expected.has(entry.label)) || labels.some(label => !observed.has(label))) return { problems: ['"frames" must describe every requested frame exactly once, using its exact label'] };
   const score = Number(raw.score);
   if (!Number.isFinite(score)) return { problems: ['"score" must be a number from 1 to 10'] };
   const problems: string[] = [];
@@ -58,8 +60,7 @@ export function readCritique(reply: unknown, labels: string[]): { critique?: Cri
     problems.push(`${frame ? `${frame}: ` : ''}${problem}${fix ? ` Fix: ${fix}` : ''}`);
   }
   const clamped = Math.max(1, Math.min(10, score));
-  // Nothing actionable means nothing to rewrite, whatever the score says.
-  const ready = problems.length === 0 || (raw.ready === true && clamped >= readyScore);
+  const ready = raw.ready === true && clamped >= readyScore && problems.length === 0;
   return { problems: [], critique: { score: clamped, ready, problems, seen } };
 }
 

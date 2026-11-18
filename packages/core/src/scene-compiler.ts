@@ -1,4 +1,5 @@
 import type { VideoPlan } from '@ove/schema';
+import { compileSceneLayout } from './scene-layouts';
 
 type SceneBuild = { layers: any[]; note: string };
 type Options = { width: number; height: number; durationFrames: number; font: string; ink: string; muted: string; accent: string; surface: string };
@@ -10,6 +11,7 @@ const rect = (id: string, options: Options, extra: Record<string, unknown> = {})
 /** Compiles a semantic scene shape into safe, editable primitive layers. No model code or opaque templates are involved. */
 export function compileSemanticScene(beat: VideoPlan['beats'][number], options: Options): SceneBuild | undefined {
   const input = beat.visual.input;
+  if (input?.layout) return compileSceneLayout(beat.id, input, options);
   if (input) beat = { ...beat, onScreen: input.type === 'before-after' ? `${input.before} / ${input.after}` : input.headline };
   const scene = beat.visual.scene, copy = beat.onScreen ?? beat.intent, w = options.width, h = options.height, m = Math.min(w, h);
   const label = (value: string, x: number, y: number) => text(`${beat.id}-${value}`, value.toUpperCase(), options, { x, y, fontSize: Math.max(22, Math.round(m * 0.022)), fontWeight: 700, color: options.muted, letterSpacing: m * 0.002 });

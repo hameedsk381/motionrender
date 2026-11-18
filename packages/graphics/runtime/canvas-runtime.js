@@ -172,7 +172,7 @@ async function prepareHtml(ops){for(const op of ops){if(op.kind==='group'){await
     try{const img=new Image();img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(await htmlSvg(op));await img.decode();htmlImages.set(op.htmlKey,img)}
     catch(e){const err=new Error('Layer "'+l.id+'" (html): could not be drawn ('+(e&&e.message||'the markup or CSS may be malformed')+')');err.oveLayer=true;throw err}
     while(htmlImages.size>48)htmlImages.delete(htmlImages.keys().next().value)}}
-function drawHtml(op){const img=htmlImages.get(op.htmlKey);if(img)ctx.drawImage(img,0,0,op.layer.width,op.layer.height)}
+function drawHtml(op){const img=htmlImages.get(op.htmlKey);if(img)ctx.drawImage(img,0,0,op.layer.width,op.layer.height);if(notes&&op.domTexts)for(const t of op.domTexts)note(op,t.x,t.y,t.w,t.h,t.size,{id:op.layer.id+'/dom-'+t.key,kind:'text',text:t.text.slice(0,60),words:t.words,baseSize:t.size,color:t.color,alpha:t.alpha*ctx.globalAlpha*noteAlpha,truncated:false,shrunk:false,clipped:t.clipped,contrast:t.contrast,occluded:t.occluded})}
 // Lottie layers: each layer gets its own lottie-web animation, drawn by the light canvas player into an offscreen canvas of the
 // layer's size, seeked to the exact frame (fractional frames too, for motion blur), then drawn like a picture. Animation data is
 // given by src (the renderer passes parsed JSON, the Player URLs, fetched once).
@@ -206,6 +206,21 @@ async function prepareCode(ops){for(const op of ops){if(op.kind==='group'){await
 // is mounted, awaited (delayRender), then snapshotted (canvases become pictures) and drawn through the html path below, so fonts, pictures
 // and CSS behave exactly as in an html layer. Styles that libraries add to the page (css-in-js, imported CSS) are carried along.
 const reactEntries=new Map(),liveHosts=new Map();let liveBaseline;
+function reviewRgb(value){const match=/^rgba?\(([^)]+)\)$/.exec(value);if(!match)return;const parts=match[1].split(/[\s,/]+/).filter(Boolean).map(Number);return parts.length>=3?parts:undefined}
+function liveContrast(el,box,colour){const foreground=reviewRgb(colour);if(!foreground||foreground[3]!==undefined&&foreground[3]<.99)return;
+  for(let p=el;p;p=p.parentElement){const css=getComputedStyle(p);if(css.backgroundImage!=='none'||css.filter!=='none'||css.mixBlendMode!=='normal')return;const background=reviewRgb(css.backgroundColor);if(background&&(background[3]===undefined||background[3]>=.99)){const luminance=rgb=>rgb.slice(0,3).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);const a=luminance(foreground),b=luminance(background);return(Math.max(a,b)+.05)/(Math.min(a,b)+.05)}if(p===box)break}}
+// Only mark fully covering opaque positioned siblings with an explicit higher z-index.
+// Complex stacking contexts and partial occlusion remain unknown rather than guessed.
+function liveOccluded(el,box,rect){for(let branch=el;branch&&branch!==box;branch=branch.parentElement){const parent=branch.parentElement;if(!parent)break;const z=Number.parseInt(getComputedStyle(branch).zIndex)||0;for(const sibling of parent.children){if(sibling===branch)continue;const s=getComputedStyle(sibling),colour=reviewRgb(s.backgroundColor);if(s.display==='none'||s.visibility==='hidden'||s.position==='static'||Number(s.opacity)<.99||!(Number.parseInt(s.zIndex)>z)||!colour||(colour[3]!==undefined&&colour[3]<.99))continue;const r=sibling.getBoundingClientRect();if(r.left<=rect.left&&r.top<=rect.top&&r.right>=rect.right&&r.bottom>=rect.bottom)return true}}return false}
+// Measure mounted React text before rasterization. Canvas transforms are applied later by note().
+function inspectLiveText(box){const root=box.getBoundingClientRect(),walker=document.createTreeWalker(box,NodeFilter.SHOW_TEXT),items=[];let serial=0;
+  while(walker.nextNode()){const node=walker.currentNode,el=node.parentElement,text=(node.textContent||'').replace(/\s+/g,' ').trim();if(!text||!el||el.closest('style,script'))continue;
+    const key=serial++;let alpha=1,hidden=false;for(let p=el;p&&p!==box.parentElement;p=p.parentElement){const s=getComputedStyle(p);alpha*=Number(s.opacity);if(s.display==='none'||s.visibility==='hidden')hidden=true}if(hidden||alpha<.01)continue;
+    const range=document.createRange();range.selectNodeContents(node);const rect=range.getBoundingClientRect();if(!rect.width||!rect.height)continue;
+    const css=getComputedStyle(el);let clipped=false;for(let p=el;p&&p!==box;p=p.parentElement){const s=getComputedStyle(p),r=p.getBoundingClientRect();if(/hidden|clip/.test(s.overflowX)&&(rect.left<r.left-2||rect.right>r.right+2))clipped=true;if(/hidden|clip/.test(s.overflowY)&&(rect.top<r.top-2||rect.bottom>r.bottom+2))clipped=true}
+    const colour=el instanceof SVGElement?css.fill:css.color;
+    items.push({key,text,words:text.split(/\s+/).length,x:rect.left-root.left,y:rect.top-root.top,w:rect.width,h:rect.height,size:parseFloat(css.fontSize),alpha,color:colour,clipped,contrast:alpha>=.99?liveContrast(el,box,colour):undefined,occluded:liveOccluded(el,box,rect)});
+  }return items}
 // Web fonts and pictures a stylesheet names by address are fetched and written in as data (an image drawn from markup loads nothing itself); the
 // result is kept per stylesheet text. A stylesheet the page may not read rule by rule (another origin) is fetched as text instead.
 const liveInlined=new Map();
@@ -222,7 +237,7 @@ async function liveSnapshot(entry,op){const l=op.layer,v=op.vars||{};let host=li
   from.forEach((canvas,i)=>{const rect=canvas.getBoundingClientRect(),img=document.createElement('img');img.setAttribute('src',canvas.toDataURL('image/png'));
     const style=canvas.getAttribute('style')||'';img.setAttribute('style',style+(/(^|;)\s*width\s*:/.test(style)?'':';width:'+rect.width+'px')+(/(^|;)\s*height\s*:/.test(style)?'':';height:'+rect.height+'px'));
     if(canvas.className)img.className=canvas.className;to[i].replaceWith(img)});
-  return{html:clone.innerHTML,css:await liveCss()}}
+  return{html:clone.innerHTML,css:await liveCss(),texts:op.audit?inspectLiveText(box):undefined}}
 async function prepareReact(ops){for(const op of ops){if(op.kind==='group'){await prepareReact(op.children||[]);continue}if(op.kind!=='react')continue;const l=op.layer;
     try{let entry=reactEntries.get(l.src);if(!entry){const given=codeSources[l.src];if(!given)throw new Error('the bundle '+l.src+' was not loaded');
         const text=typeof given.text==='string'?given.text:await fetch(given.url).then(r=>{if(!r.ok)throw new Error('could not load '+given.url);return r.text()});
@@ -231,7 +246,7 @@ async function prepareReact(ops){for(const op of ops){if(op.kind==='group'){awai
         if(typeof entry.render!=='function'&&typeof entry.mount!=='function')throw new Error('the bundle did not register a component; rebuild it with ove build');reactEntries.set(l.src,entry)}
       const v=op.vars||{};let html,css='',cacheKey;
       if(entry.mount){cacheKey=JSON.stringify(['live',l.src,l.id,Number(v['--frame'])||0,l.props||{},l.width,l.height,l.resolution]);
-        if(htmlImages.has(cacheKey))html='';else{const made=await liveSnapshot(entry,op);html=made.html;css=made.css}}
+        if(htmlImages.has(cacheKey)&&!op.audit)html='';else{const made=await liveSnapshot(entry,op);html=made.html;css=made.css;op.domTexts=made.texts}}
       else{html=entry.render({frame:Number(v['--frame'])||0,fps:Number(v['--fps'])||30,width:l.width,height:l.height,durationInFrames:l.durationInFrames,props:l.props||{}});if(typeof html!=='string')throw new Error('the component did not render to markup')}
       op.kind='html';op.layer=Object.assign({},l,{type:'html',html,css,vars:{},resolution:l.resolution||1,cacheKey});op.vars={}}
     catch(e){const err=new Error('Layer "'+l.id+'" (react): '+(e&&e.message||e));err.oveLayer=true;throw err}}}
@@ -326,7 +341,7 @@ function drawMasked(op){const l=op.layer,kids=op.children||[],matteOp=kids[kids.
   main.save();main.setTransform(1,0,0,1,0,0);main.drawImage(A,0,0);main.restore()}
 function drawChildren(op){if(!op.layer.layout){for(const child of op.children)drawOp(child);return}const {places}=layoutPlan(op);op.children.forEach((child,i)=>{ctx.save();ctx.translate(places[i].x,places[i].y);drawOp(child);ctx.restore()})}
 return{canvas:c,images,load:async(sources,fonts,lotties,codes,models)=>{modelSources=models||{};modelScenes.clear();modelBuffers.clear();fontList=fonts||[];lottieSources=lotties||{};codeSources=codes||{};codeFns.clear();codeCanvases.clear();for(const i of p5Instances.values()){i.p.remove();i.host.remove()}p5Instances.clear();reactEntries.clear();lottieData.clear();lottieAnims.clear();htmlFontCss=undefined;usedFamilies.clear();imageUrls=new Map(Object.entries(sources||{}));await Promise.all((fonts||[]).map(async f=>{const face=new FontFace(f.family,'url('+f.url+')',f.unicodeRange?{weight:String(f.weight),style:f.style,unicodeRange:f.unicodeRange}:{weight:String(f.weight),style:f.style});try{await face.load()}catch{throw new Error('Failed to load font '+f.family+' from '+f.src)}document.fonts.add(face)}));await Promise.all(Object.entries(sources||{}).map(([src,url])=>new Promise((res,rej)=>{const i=new Image();i.onload=()=>{images.set(src,i);res()};i.onerror=()=>rej(new Error('Failed to load image '+src));i.src=url})))},
-draw:async(p,drawables)=>{globalThis.__oveRenderScale=p.scaleX||1;frames=new Map(await Promise.all(Object.entries(p.videoFrames||{}).map(async([key,url])=>{const i=new Image();i.src=url;await i.decode();return [key,i]})));if(drawables)for(const [k,v] of drawables)frames.set(k,v);for(const ops of [p.operations,...(p.subframes||[]).map(s=>s.operations)]){await prepareReact(ops);await prepareHtml(ops);await prepareLottie(ops);await prepareModels(ops);await prepareCode(ops)}if(c.width!==p.width)c.width=p.width;if(c.height!==p.height)c.height=p.height;notes=p.report?{texts:[],thumb:null}:null;unscale=p.scaleX?1/p.scaleX:1;
+draw:async(p,drawables)=>{globalThis.__oveRenderScale=p.scaleX||1;frames=new Map(await Promise.all(Object.entries(p.videoFrames||{}).map(async([key,url])=>{const i=new Image();i.src=url;await i.decode();return [key,i]})));if(drawables)for(const [k,v] of drawables)frames.set(k,v);const audit=ops=>{for(const op of ops){op.audit=!!p.report;if(op.children)audit(op.children)}};for(const ops of [p.operations,...(p.subframes||[]).map(s=>s.operations)]){audit(ops);await prepareReact(ops);await prepareHtml(ops);await prepareLottie(ops);await prepareModels(ops);await prepareCode(ops)}if(c.width!==p.width)c.width=p.width;if(c.height!==p.height)c.height=p.height;notes=p.report?{texts:[],thumb:null}:null;unscale=p.scaleX?1/p.scaleX:1;
   if(p.subframes&&p.subframes.length>1)blurred(p);else paintFrame(p,p.operations);if(p.grain>0&&!p.transparent)grain(p.grain,p.frame||0);if(notes)notes.thumb=thumbnail()},
 report:()=>notes}
 function drawTexture(p){const t=p.texture;if(!t||!t.type||t.type==='none')return;const w=p.scaleX?c.width/p.scaleX:c.width,h=p.scaleY?c.height/p.scaleY:c.height,s=Math.max(6,t.scale||48);ctx.save();ctx.globalAlpha*=Math.max(0,Math.min(1,t.opacity??0.06));ctx.strokeStyle=t.color||'#ffffff';ctx.fillStyle=t.color||'#ffffff';ctx.lineWidth=1;
