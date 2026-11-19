@@ -1,5 +1,6 @@
 import type { Layer } from '@ove/schema';
 import type { ScrapedWebsite } from './brand-scraper';
+import { luminance } from './brand-css';
 
 type Scene = any;
 
@@ -12,7 +13,7 @@ export interface StyleContext {
   tagline: string;
   ctaText: string;
   displayUrl: string;
-  features: [string, string, string];
+  features: string[];
   width: number;
   height: number;
   aspect: '9:16' | '16:9' | '1:1';
@@ -67,15 +68,13 @@ export function detectArchetype(
 
 export function extractKeyFeatures(
   metadata: ScrapedWebsite | { name: string; brandColor: string },
-  targetName: string,
-  style: LaunchReelStyle
-): [string, string, string] {
+): string[] {
   const scraped = metadata as ScrapedWebsite;
   const candidates: string[] = [];
 
   if (scraped.headings && Array.isArray(scraped.headings)) {
     for (const h of scraped.headings) {
-      const clean = h.trim().replace(/^[\d\W_]+/, '').replace(/[\r\n]+/g, ' ');
+      const clean = h.replace(/\s+/g, ' ').trim();
       if (
         clean.length >= 10 &&
         clean.length <= 45 &&
@@ -93,54 +92,17 @@ export function extractKeyFeatures(
   }
 
   if (scraped.paragraphs && Array.isArray(scraped.paragraphs)) {
+    const sentences = new Intl.Segmenter('en', { granularity: 'sentence' });
     for (const p of scraped.paragraphs) {
-      const clean = p.trim().replace(/[\r\n]+/g, ' ');
-      const sentence = clean.split(/[.!?]/)[0]?.trim() || '';
+      const clean = p.replace(/\s+/g, ' ').trim();
+      const sentence = sentences.segment(clean).containing(0)?.segment.trim() ?? '';
       if (sentence.length >= 14 && sentence.length <= 42 && !candidates.includes(sentence)) {
         candidates.push(sentence);
       }
     }
   }
 
-  const fallbacksByStyle: Record<LaunchReelStyle, [string, string, string]> = {
-    keynote: [
-      'Precision-Engineered Architecture',
-      'Designed for High-Velocity Teams',
-      'Zero Setup, Production Ready',
-    ],
-    terminal: [
-      'Deterministic Sub-Millisecond Core',
-      'Zero-Config CLI & Autonomous Agents',
-      'Local-First, Self-Hosted Infrastructure',
-    ],
-    editorial: [
-      'Crafted with Obsessive Restraint',
-      'Thoughtful Geometry at Every Scale',
-      'Timeless Design Meets Modern Speed',
-    ],
-    blueprint: [
-      'Precision Component Topology',
-      'Fault-Tolerant Modular Architecture',
-      'Verified Production Specifications',
-    ],
-    neon: [
-      'Hyper-Speed Neural Execution Engine',
-      'Autonomous Real-Time Motion Sync',
-      'Ultra-Vibrant Visual Choreography',
-    ],
-    bento: [
-      'Intelligent Workflow Automation',
-      'Unified High-Density Dashboard',
-      'Built-in Enterprise Scalability',
-    ],
-  };
-
-  const defaultList = fallbacksByStyle[style] || fallbacksByStyle.keynote;
-  return [
-    candidates[0] || defaultList[0],
-    candidates[1] || defaultList[1],
-    candidates[2] || defaultList[2],
-  ];
+  return candidates.slice(0, 3);
 }
 
 /**
@@ -333,6 +295,33 @@ function createLightSheen(cardW: number, cardH: number): Layer {
  * Builds archetype-specific scenes with custom layouts, typography, and motion grammar.
  */
 export function buildArchetypeScenes(ctx: StyleContext): Scene[] {
+  const scenes = styleScenes(ctx);
+  const closing = scenes.find(scene => scene.id === 'scene-cta');
+  const buttons = new Set(['k-cta-btn', 't-btn', 'e-cta-btn', 'bp-btn', 'n-cta-btn', 'bn-cta-btn']);
+  closing.layers = closing.layers.filter((layer: Layer) => ctx.ctaText || !buttons.has(layer.id));
+  for (const layer of closing.layers as Layer[]) {
+    if (layer.type !== 'group' || !buttons.has(layer.id)) continue;
+    for (const child of layer.children) {
+      if (child.type === 'rect') child.fill = ctx.brandColor;
+      if (child.type === 'text') child.color = luminance(ctx.brandColor) > 0.179 ? '#000000' : '#ffffff';
+    }
+  }
+  if (!ctx.displayUrl) {
+    closing.layers = closing.layers.filter((layer: Layer) => !layer.id.endsWith('-url'));
+  }
+  if (!ctx.features.length) {
+    const index = scenes.findIndex(scene => scene.id === 'scene-features');
+    scenes[index - 1].durationFrames += scenes[index].durationFrames;
+    scenes.splice(index, 1);
+  } else if (ctx.style === 'bento') {
+    const features = scenes.find(scene => scene.id === 'scene-features');
+    features.layers = features.layers.filter((layer: Layer) =>
+      !layer.id.startsWith('bn-box-') || Number(layer.id.slice('bn-box-'.length)) <= ctx.features.length);
+  }
+  return scenes;
+}
+
+function styleScenes(ctx: StyleContext): Scene[] {
   switch (ctx.style) {
     case 'terminal':
       return buildTerminalScenes(ctx);
@@ -451,7 +440,7 @@ function buildKeynoteScenes(ctx: StyleContext): Scene[] {
         {
           type: 'text',
           id: 'k-sub',
-          content: tagline.length > 55 ? tagline.slice(0, 55).replace(/\s+\S*$/, '…') : tagline,
+          content: tagline,
           x: width / 2,
           y: isVertical ? height * 0.49 : height * 0.50,
           width: isVertical ? 840 : 1200,
@@ -837,7 +826,7 @@ function buildTerminalScenes(ctx: StyleContext): Scene[] {
             {
               type: 'text',
               id: 't-prompt-sub',
-              content: `// ${tagline.slice(0, 48)}`,
+              content: tagline,
               x: 28,
               y: isVertical ? 260 : 265,
               fontSize: isVertical ? 20 : 22,
@@ -1059,7 +1048,7 @@ function buildTerminalScenes(ctx: StyleContext): Scene[] {
             {
               type: 'text',
               id: 't-cta-cmd',
-              content: `$ npx ${targetName.toLowerCase()}@latest`,
+              content: targetName,
               x: 36,
               y: 44,
               fontSize: isVertical ? 28 : 34,
@@ -1204,7 +1193,7 @@ function buildEditorialScenes(ctx: StyleContext): Scene[] {
         {
           type: 'text',
           id: 'e-sub',
-          content: `"${tagline.slice(0, 52)}"`,
+          content: tagline,
           x: width / 2,
           y: isVertical ? height * 0.49 : height * 0.49,
           width: isVertical ? 840 : 1100,
@@ -1529,7 +1518,7 @@ function buildBlueprintScenes(ctx: StyleContext): Scene[] {
         {
           type: 'text',
           id: 'bp-sub',
-          content: `[ SPEC: ${tagline.slice(0, 50)} ]`,
+          content: tagline,
           x: width / 2,
           y: isVertical ? height * 0.48 : height * 0.48,
           width: isVertical ? 800 : 1100,
@@ -1719,7 +1708,7 @@ function buildBlueprintScenes(ctx: StyleContext): Scene[] {
             {
               type: 'text',
               id: 'bp-stamp-txt',
-              content: 'APPROVED FOR PRODUCTION ✓',
+              content: targetName,
               x: 20,
               y: 18,
               fontSize: 20,
@@ -1857,7 +1846,7 @@ function buildNeonScenes(ctx: StyleContext): Scene[] {
             {
               type: 'text',
               id: 'n-pill-txt',
-              content: `⚡ NEXT-GEN RELEASE // 2026`,
+              content: targetName,
               x: isVertical ? 28 : 42,
               y: isVertical ? 14 : 16,
               fontSize: isVertical ? 18 : 20,
@@ -1894,7 +1883,7 @@ function buildNeonScenes(ctx: StyleContext): Scene[] {
         {
           type: 'text',
           id: 'n-sub',
-          content: tagline.slice(0, 52),
+          content: tagline,
           x: width / 2,
           y: isVertical ? height * 0.49 : height * 0.50,
           width: isVertical ? 840 : 1100,
@@ -2167,7 +2156,7 @@ function buildBentoScenes(ctx: StyleContext): Scene[] {
             {
               type: 'text',
               id: 'bn-pill-txt',
-              content: `✦ THE MODERN STANDARD`,
+              content: targetName,
               x: isVertical ? 32 : 46,
               y: isVertical ? 14 : 16,
               fontSize: isVertical ? 18 : 20,
@@ -2200,7 +2189,7 @@ function buildBentoScenes(ctx: StyleContext): Scene[] {
         {
           type: 'text',
           id: 'bn-sub',
-          content: tagline.slice(0, 52),
+          content: tagline,
           x: width / 2,
           y: isVertical ? height * 0.49 : height * 0.50,
           width: isVertical ? 840 : 1100,

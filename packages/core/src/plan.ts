@@ -1,3 +1,6 @@
+import { foldClosed } from './fold-layers';
+import { splitArrival } from './split-layers';
+import { scheduleRoute } from '../../timeline/src/route';
 import { parseComposition, productionSchema, type Production, type VideoPlan, type VideoPlanEdit, videoPlanEditsSchema, videoPlanSchema } from '@ove/schema';
 import { compileProduction, type CompiledProduction } from './production';
 import { sceneCatalog } from './scene-catalog';
@@ -44,7 +47,18 @@ export function compileVideoPlan(input: VideoPlan | unknown): CompiledProduction
   }
   for (const scene of compiled.composition.scenes) {
     const board = plan.beats.find(beat => beat.id === scene.id)?.storyboard;
-    if (board) scene.metadata.storyboard = board;
+    if (!board) continue;
+    const input = plan.beats.find(beat => beat.id === scene.id)?.visual.input;
+    if (input?.type === 'fold') {
+      scene.metadata.storyboard = { ...board, cue: 'Cover closed', moment: foldClosed(input) };
+      continue;
+    }
+    if (input?.type === 'split') {
+      scene.metadata.storyboard = { ...board, cue: 'Both endpoints reached', moment: splitArrival };
+      continue;
+    }
+    const cue = input?.type === 'route' ? scheduleRoute(input, scene.durationFrames).cue : undefined;
+    scene.metadata.storyboard = cue ? { ...board, cue: cue.name, moment: cue.frame / Math.max(1, scene.durationFrames - 1) } : board;
   }
   const modules = new Map(plan.sceneModules.map(module => [module.id, module]));
   for (const beat of plan.beats) {

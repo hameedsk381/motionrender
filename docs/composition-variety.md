@@ -30,8 +30,70 @@ These controls show sensitivity to the intended differences in this sample. They
 
 ## Directing with React drawings
 
-Run `mr plan direct "your brief" --react --format 9:16 --output explainer.json`, then `mr make explainer.json --no-voice`. The React director chooses a look and storyboards from the full explainer scene catalog. It fills each selected drawing separately using its schema and supported variants. The output uses explainer timing.
+Run `mr plan direct "your brief" --react --format 9:16 --output explainer.json`, then `mr make explainer.json --no-voice`. The React director extracts ordered routes, simultaneous branches, and open-to-closed folds before it chooses a look and scenes. Each extracted action must appear once and in order. The compiler uses the extracted path labels and fold titles, while the director supplies drawing choices such as branch directions and fold artwork. Supply a file path in the brief to use a media scene. An explicitly silent brief produces a script with `silent: true`, which suppresses narration, music, and sound effects during the build. The output uses explainer timing.
 
 After building, `mr review composition.json --allow-code --clips-dir checkpoints --json` writes short silent MP4s around the planned moments and reports the scene and target frame for each. Only enable code for trusted compositions.
 
+The React plan command checks named media files relative to the script output directory. If a file is missing, the director chooses from the drawings and media still available. Invalid scene replies get a correction with the field paths and the original drawing contract. The director also checks common measurable claims, numeric chart values, and exact quotations against the brief. Provide the figures and source text you want to use in the video.
+
 For a soundtrack revision, use `mr soundtrack original.mp4 --audio mix.wav --output revised.mp4`. The new audio replaces the whole audio track. For local primitive renders, `mr render composition.json --frame-cache .frames --cache-namespace my-renderer-v1` enables frame reuse. Change the namespace when fonts, browser or renderer versions change. React, asset-backed scenes and transitions bypass this cache.
+
+A `route` scene keeps station labels fixed while a traveler visits the stops listed for each trip. Its trace clears at the start of the next trip. In React explainer JSON, use this scene shape:
+
+```json
+{
+  "kind": "route",
+  "stops": ["Depot", "Sorting hub", "Home"],
+  "trips": [
+    {"name": "Standard", "via": ["Depot", "Sorting hub", "Home"]},
+    {"name": "Local", "via": ["Depot", "Home"]}
+  ],
+  "cue": {"name": "Delivered locally", "trip": "Local", "stop": "Home"}
+}
+```
+
+With a storyboard, review anchors its decisive frame at that arrival. To select a repeated stop, specify its one-based visit in the trip. An optional `save` event uses the same reference with a `label` that stays visible at the stop. Semantic plans use the same data in `visual.input`, with `type: "route"`, a headline and `visual.scene: "route"`.
+
+For simultaneous distribution, choose `split`. Give it one origin and exactly two named endpoints with distinct directions. Both travelers start together and leave visible traces. A storyboard review samples their arrival. Example React scene:
+
+```json
+{"kind":"split","origin":"Depot","branches":[{"endpoint":"West district","direction":"left"},{"endpoint":"East district","direction":"right"}]}
+```
+
+Directions are `left`, `right`, `down`, `down-left` and `down-right`. Semantic plans use the same fields in a `split` scene input with a headline.
+
+Use `fold` for a physical, two-panel sheet. Set `inside` and `cover` to the printed titles, `artwork` to `print` or `map`, and `direction` to `right-to-left` or `left-to-right`. The moving panel turns edge-on at the crease, then reveals its reverse face. The storyboard checkpoint follows the frame where the cover closes. Semantic scene inputs use layout `sheet` and choreography `hinge`.
+
+Both explainer and semantic scene inputs accept an optional `variant` for these actions.
+
+| Action | Default | Alternative |
+|---|---|---|
+| Route | `map` positions the stops around a network | `rail` aligns them in station order and carries a bypass above the unvisited stops |
+| Split | `fork` traces straight rays from the origin | `manifold` shares an inlet and uses right-angle branches, with both endpoints reached together |
+| Fold | `sheet` turns continuously over a tall page | `booklet` uses a wide cover and briefly holds at the crease |
+
+## Authoring in Markdown
+
+Write a `video.md` with a heading for each beat and labelled lines for anything the compiler needs to draw. The default `mr plan direct "your brief" --output video.md` asks the configured model to write this format. You can also write the same file by hand and run `mr make video.md --draft` without a model.
+
+```markdown
+---
+title: Two trains
+format: 9:16
+---
+
+# The express skips Market
+Duration: 6s
+Scene: route
+Variant: rail
+Trip: Local | Central → Market → Harbor
+Trip: Express | Central → Harbor
+Arrival: Express arrival | Express → Harbor
+```
+
+- A route infers its stops from the trips. Add an optional `Stops: Central → Market → Harbor` to specify their display order. `Arrival:` and `Save:` accept a stop name or a one-based visit such as `#3` after the trip name. Without an arrival line the cue uses the final visit of the last trip.
+- A split uses `Origin:` and two `Branch: name | direction` lines. A fold uses `Inside:` and `Cover:`. Its optional `Artwork:` and `Direction:` default to `print` and `right-to-left`.
+- A workflow uses three `Step:` lines. A before-and-after scene uses `Before:` and `After:`. A kinetic hook or CTA can use `On-screen:` for its copy.
+- For a custom visual, build a trusted component with `mr build scene.tsx --output scene.preview.json`. Add `> React [hero]: ./scene.bundle.js` to the Markdown, then `Module: hero` under the relevant beat. The component receives the beat and its timing. Run `mr make video.md --allow-code --draft` to review and render it.
+
+The build produces `composition.json` for validation, review and rendering. Existing plans that use `Scene-input:` still load.

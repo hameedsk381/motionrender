@@ -39,6 +39,8 @@ export type SmartResult = ComposeResult & { source?: Record<string, unknown>; /*
  * write React (it will run the code itself) a designed video is written as React; anything else is a full JSON composition.
  */
 export async function composeSmart(provider: AiProvider, options: ComposeOptions, source: ComposeSource, mode: SmartMode = {}): Promise<SmartResult> {
+  const mock = provider.id === 'mock';
+  if (mock) options.onProgress?.('Offline mock: creating a JSON placeholder to test the render workflow.');
   // Content first: the script and its evidence are written (or supplied) before design.
   let content: VideoContent | undefined = options.content === false ? undefined : options.content && contentSchema.parse(options.content);
   if (!content && options.content !== false) {
@@ -60,7 +62,7 @@ export async function composeSmart(provider: AiProvider, options: ComposeOptions
   const scripted = content ? { ...withoutContent, content } : withoutContent;
   const needsFull = mode.full || !!options.fields?.length || (options.assets ?? []).some(asset => asset.type !== 'image');
   let plan: BuildPlan | undefined;
-  if (!mode.noPlan && !mode.full && (mode.registry || source.registry)) {
+  if (!mock && !mode.noPlan && !mode.full && (mode.registry || source.registry)) {
     const registry = mode.registry ?? await source.registry!();
     try { plan = await planBuild(provider, { ...scripted, registry, allowReact: Boolean(source.react), brand: options.brand, maxAttempts: Math.min(options.maxAttempts ?? 2, 2) }); }
     catch (error) { options.onProgress?.(`Planning skipped (${(error as Error).message.split('\n')[0]}); using the built-in routing.`); }
@@ -71,7 +73,7 @@ export async function composeSmart(provider: AiProvider, options: ComposeOptions
   // A video is written as React wherever the host can run the code (it executes inside the renderer). The planner's own "json" answer
   // is not honoured, and a failed React build is an error, not a quiet switch to a composition. JSON authoring is left only for what
   // React cannot express: a host that cannot run code, batch variable fields, non-image assets, or an explicit `full`.
-  if (!needsFull && source.react) {
+  if (!mock && !needsFull && source.react) {
     const reactPlan: BuildPlan = plan
       ? { ...plan, path: 'react' }
       : { path: 'react', idea: options.brief, beats: (content?.beats ?? []).map(beat => ({ name: beat.name, onScreen: beat.onScreen, seconds: beat.seconds, motion: beat.motion })), reasons: [] };
@@ -85,5 +87,7 @@ export async function composeSmart(provider: AiProvider, options: ComposeOptions
   }
   // The planner's beats and art direction become the motion plan the composition must follow, so planning is never wasted.
   const motionPlan = plan ? { idea: plan.idea, beats: plan.beats, look: plan.look, ...(content ? { content } : {}) } : (content ? { beats: content.beats.map(beat => ({ name: beat.name, onScreen: beat.onScreen, seconds: beat.seconds, motion: beat.motion })), ...(brandStyle ? { look: brandStyle } : {}), content } : undefined);
-  return { ...(await composeVideo(provider, { ...scripted, plan: options.plan || motionPlan !== undefined, motionPlan })), route: 'json' };
+  const result = await composeVideo(provider, { ...scripted, plan: !mock && (options.plan || motionPlan !== undefined), motionPlan });
+  if (mock) result.warnings.unshift('Offline mock output is a placeholder. Configure a text model to generate from the brief.');
+  return { ...result, route: 'json' };
 }

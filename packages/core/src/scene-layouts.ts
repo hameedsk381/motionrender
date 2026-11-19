@@ -1,9 +1,15 @@
+import { foldLayers } from './fold-layers';
+import { splitLayers } from './split-layers';
+import { routeLayers } from './route-layers';
 import type { SceneInput } from '@ove/schema';
 
 export type SceneLayoutOptions = { width: number; height: number; durationFrames: number; font: string; ink: string; muted: string; accent: string; surface: string };
 
 /** Explicit spatial arrangements and bounded motion, independent of copy and palette. */
 export function compileSceneLayout(id: string, input: SceneInput, o: SceneLayoutOptions): { layers: any[]; note: string } | undefined {
+  if (input.type === 'fold') return { layers: foldLayers(id, input, o), note: 'hinged paper fold' };
+  if (input.type === 'split') return { layers: splitLayers(id, input, o), note: 'simultaneous split' };
+  if (input.type === 'route') return { layers: routeLayers(id, input, o), note: 'named route actions' };
   if (!input.layout) return;
   const w = o.width, h = o.height, m = Math.min(w, h), layers: any[] = [];
   const motion = input.choreography ?? 'reveal';

@@ -1,6 +1,10 @@
 // Turns an explainer script (the scenes and what is said over them) into a composition. Each scene kind draws one kind of small animated
 // diagram on the same dark board, with the same header and footer on every scene, so any topic gets a consistent video. Nothing here
 // runs while rendering: the result is plain composition JSON, frame-exact like any other.
+import { foldLayers, foldClosed } from './fold-layers';
+import { splitLayers, splitArrival } from './split-layers';
+import { routeLayers } from './route-layers';
+import { scheduleRoute } from '../../timeline/src/route';
 import type { Explainer, ExplainerScene } from '@ove/schema';
 import { explainerCornerScale, explainerFontMaxWeight, explainerLookDefs, explainerWeightValue, groupCaptionWords, type CaptionCue } from '@ove/schema';
 
@@ -484,7 +488,23 @@ export function autoLayout(scene: ExplainerScene, fallback: 'card' | 'editorial'
   }
 }
 
-const kinds: { [K in ExplainerScene['kind']]: Kind<K> } = { title: pick(title, titleEditorial), flow, grid, steps: pick(steps, stepsEditorial), compare, stat: pick(stat, statEditorial), chart, timeline, pile, media, phone, hex, quote, code, world, freeform, closing: pick(closing, closingEditorial) };
+const fold: Kind<'fold'> = scene => ({ min: 165, layers: durationFrames => foldLayers('fold', scene, {
+  width: W, height: H, durationFrames, font: '{{fontDisplay}}', ink: '{{text}}', muted: '{{muted}}', accent: GOLD, surface: '{{surface}}',
+}) });
+const split: Kind<'split'> = scene => ({ min: 165, layers: durationFrames => splitLayers('split', scene, {
+  width: W, height: H, durationFrames, font: '{{fontDisplay}}', ink: '{{text}}', muted: '{{muted}}', accent: GOLD, surface: '{{surface}}',
+}) });
+const route: Kind<'route'> = scene => ({ min: 240, layers: durationFrames => routeLayers('route', scene, {
+  width: W, height: H, durationFrames, font: '{{fontDisplay}}', ink: '{{text}}', muted: '{{muted}}', accent: GOLD, surface: '{{surface}}',
+}) });
+function sceneBoard(scene: ExplainerScene, frames: number) {
+  if (scene.kind === 'fold' && scene.storyboard) return { ...scene.storyboard, cue: 'Cover closed', moment: foldClosed(scene) };
+  if (scene.kind === 'split' && scene.storyboard) return { ...scene.storyboard, cue: 'Both endpoints reached', moment: splitArrival };
+  if (scene.kind !== 'route' || !scene.storyboard) return scene.storyboard;
+  const cue = scheduleRoute(scene, frames).cue;
+  return { ...scene.storyboard, cue: cue.name, moment: cue.frame / Math.max(1, frames - 1) };
+}
+const kinds: { [K in ExplainerScene['kind']]: Kind<K> } = { fold, split, route, title: pick(title, titleEditorial), flow, grid, steps: pick(steps, stepsEditorial), compare, stat: pick(stat, statEditorial), chart, timeline, pile, media, phone, hex, quote, code, world, freeform, closing: pick(closing, closingEditorial) };
 
 /* ---- the whole video ---- */
 const theme = {
@@ -502,7 +522,7 @@ export type ExplainerReactScene = { sceneId: string; index: number; scene: Expla
 export type ExplainerReactLook = { palette: Record<string, string | number>; motion: Active['motion']; cornerScale: number; weightCap: number };
 export type ExplainerCompiled = { composition: Record<string, unknown>; notes: string[]; react?: { scenes: ExplainerReactScene[]; look: ExplainerReactLook } };
 /** The scene kinds that have a React drawing (packages/react/src/explainer-view.ts). */
-export const REACT_KINDS = ['title', 'steps', 'compare', 'stat', 'chart', 'timeline', 'quote', 'flow', 'grid', 'closing', 'freeform', 'phone', 'hex', 'pile', 'media', 'code', 'world'] as const;
+export const REACT_KINDS = ['fold', 'split', 'route', 'title', 'steps', 'compare', 'stat', 'chart', 'timeline', 'quote', 'flow', 'grid', 'closing', 'freeform', 'phone', 'hex', 'pile', 'media', 'code', 'world'] as const;
 const REACT_MIN_FRAMES = 5 * FPS;
 /** The sounds a stock scene of this kind would make, for the same moments, so a React scene is not quieter than the one it replaces. */
 function reactCues(scene: ExplainerScene, frames: number): Layer[] {
@@ -606,19 +626,20 @@ function compileWith(spec: Explainer, options: CompileOptions, palette: Record<s
   const notes: string[] = [];
   const reactScenes: ExplainerReactScene[] = [];
   const reactable = options.reactKinds ?? [];
+  const audio = spec.silent ? undefined : options.audio;
   const [cw, ch] = SIZES[spec.aspect], fit = Math.min(cw / W, ch / H), column = cw !== W || ch !== H;
   const scenes = spec.scenes.map((scene, i) => {
     // A scene may pick its own layout (card or editorial), so a video is not one template from start to end.
     if (reactable.includes(scene.kind)) {
-      const spoken = options.audio?.[i], frames = Math.max(REACT_MIN_FRAMES, scene.kind === 'freeform' || scene.kind === 'world' ? Math.round((scene.duration ?? 0) * FPS) : 0, scene.kind === 'world' ? 8 * FPS : 0, spoken ? Math.ceil((spoken.seconds + 0.6) * FPS) + 8 : 0);
+      const spoken = audio?.[i], frames = Math.max(scene.kind === 'route' ? 240 : REACT_MIN_FRAMES, scene.kind === 'freeform' || scene.kind === 'world' ? Math.round((scene.duration ?? 0) * FPS) : 0, scene.kind === 'world' ? 8 * FPS : 0, spoken ? Math.ceil((spoken.seconds + 0.6) * FPS) + 8 : 0);
       const cues = spec.captions && spoken?.words?.length ? groupCaptionWords(spoken.words, 6) : undefined, sentence = (scene as { caption?: string }).caption;
       const id = `s${i + 1}-${scene.kind}`;
       if (scene.kind === 'media' && !scene.src) throw new Error('A media scene that is still a prompt has no picture yet: make the pictures first (mr explainer compile does, with an image model)');
       reactScenes.push({ sceneId: id, index: i, scene, frames, captions: !!cues });
-      return { id, name: `${i + 1}. ${scene.kind} (react)`, durationFrames: frames, metadata: { storyboard: scene.storyboard },
+      return { id, name: `${i + 1}. ${scene.kind} (react)`, durationFrames: frames, metadata: { storyboard: sceneBoard(scene, frames) },
         ...(column ? { camera: { x: W / 2, y: H / 2, zoom: fit } } : {}),
         ...(i > 0 ? { transitionIn: { type: '{{transition}}', durationFrames: 14 } } : {}),
-        layers: [...(cues && sentence ? [text('caption-note', sentence, W / 2, CAPTIONS_Y - 96, { size: 30, color: '{{muted}}', align: 'center', maxWidth: 900, maxLines: 2, lh: 1.2, anims: [fade(at(frames, 0.3), 14)] })] : []),
+        layers: [...(['fold', 'split', 'route'].includes(scene.kind) ? (kinds[scene.kind] as Kind<any>)(scene, i).layers(frames) : []), ...(cues && sentence ? [text('caption-note', sentence, W / 2, CAPTIONS_Y - 96, { size: 30, color: '{{muted}}', align: 'center', maxWidth: 900, maxLines: 2, lh: 1.2, anims: [fade(at(frames, 0.3), 14)] })] : []),
           ...(spec.chapters ? chapterBar(i, spec.scenes.length, frames) : []), ...(cues ? [captionsLayer(cues)] : []),
           ...(spoken ? [{ id: 'voice', type: 'audio', src: spoken.src, startFrame: 8, volume: 1 }] : []), ...reactCues(scene, frames)] };
     }
@@ -626,7 +647,7 @@ function compileWith(spec: Explainer, options: CompileOptions, palette: Record<s
     if (scene.layout) active = { ...active, layout: scene.layout === 'auto' ? autoLayout(scene, active.layout) : scene.layout };
     let draw: Draw;
     try { draw = (kinds[scene.kind] as Kind<any>)(scene, i); } finally { active = base; }
-    const spoken = options.audio?.[i];
+    const spoken = audio?.[i];
     const frames = Math.max(draw.min, spoken ? Math.ceil((spoken.seconds + 0.6) * FPS) + 8 : 0);
     if (spoken && frames > draw.min) notes.push(`Scene ${i + 1} (${scene.kind}) runs ${(frames / FPS).toFixed(1)} s to fit its spoken line.`);
     if (spoken && frames > LONG_SCENE_FRAMES) notes.push(`Scene ${i + 1} (${scene.kind}) holds for ${(frames / FPS).toFixed(1)} s: split it into two beats so something changes every few seconds.`);
@@ -637,14 +658,17 @@ function compileWith(spec: Explainer, options: CompileOptions, palette: Record<s
     const drawn = cues ? everything.filter(layer => layer.id !== 'caption') : everything;
     const note = sentence ? [text('caption-note', String(sentence.content), W / 2, CAPTIONS_Y - 96, { size: 30, color: '{{muted}}', align: 'center', maxWidth: 900, maxLines: 2, lh: 1.2, anims: [fade(at(frames, 0.3), 14)] })] : [];
     const picture = scene.place === 'top' || scene.kind === 'pile' || scene.kind === 'media' || scene.kind === 'freeform' ? drawn : centred(drawn, cues ? CAPTIONS_Y - (note.length ? 130 : 40) : BAND.bottom);
-    return { id: `s${i + 1}-${scene.kind}`, name: `${i + 1}. ${scene.kind}`, durationFrames: frames, metadata: { storyboard: scene.storyboard },
+    return { id: `s${i + 1}-${scene.kind}`, name: `${i + 1}. ${scene.kind}`, durationFrames: frames, metadata: { storyboard: sceneBoard(scene, frames) },
       ...(column ? { camera: { x: W / 2, y: H / 2, zoom: fit } } : {}),
       ...(i > 0 ? { transitionIn: { type: '{{transition}}', durationFrames: 14 } } : {}),
       layers: [...picture, ...note, ...(spec.chapters ? chapterBar(i, spec.scenes.length, frames) : []), ...(cues ? [captionsLayer(cues)] : []),
         ...(spoken ? [{ id: 'voice', type: 'audio', src: spoken.src, startFrame: 8, volume: 1 }] : [])] };
   });
   // A quiet bed under the voice, lowered while anything speaks or sounds. A silent build has nothing to sit under, so it gets none.
-  const bed = spec.music !== 'none' && (options.audio ?? []).some(Boolean)
+  if (spec.silent) {
+    for (const scene of scenes) scene.layers = scene.layers.filter(layer => layer.type !== 'audio');
+  }
+  const bed = spec.music !== 'none' && (audio ?? []).some(Boolean)
     ? { audio: `sfx:bed-${spec.music}`, audioVolume: 1, duck: { amount: 0.4, attackFrames: 6, releaseFrames: 18 } } : {};
   const overlay: Layer[] = [
     label('header-kind', `${spec.series} ·`, 60, HEADER_Y, { size: 22, ls: 3, color: '{{muted}}' }),

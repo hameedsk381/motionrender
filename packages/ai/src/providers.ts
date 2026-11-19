@@ -593,13 +593,13 @@ export class MockProvider implements AiProvider {
       const found = /Target length: (\d+) seconds/.exec(prompt);
       const seconds = Math.max(2, Number(found?.[1] ?? 6));
       const count = seconds < 8 ? 1 : 3;
-      const lines = ['Here is the idea.', 'It is made of motion, not slides.', 'Hold the idea.'];
+      const lines = ['This is a placeholder.', 'Add your example here.', 'Replace this with your takeaway.'];
       return JSON.stringify({
-        audience: 'viewers', promise: 'a quick look at MotionRender', cta: 'make your own',
+        audience: 'viewers',
         sources: [],
         beats: Array.from({ length: count }, (_, i) => ({
           id: `beat-${i + 1}`, name: ['Hook', 'Point', 'Payoff'][i]!, seconds: Math.max(2, Math.round(seconds / count)),
-          narration: lines[i]!, onScreen: ['Mock video', 'Designed motion', 'Hold the idea'][i]!,
+          narration: lines[i]!, onScreen: ['Mock video', 'Example details', 'Your takeaway'][i]!,
         })),
       });
     }
@@ -624,8 +624,7 @@ export class MockProvider implements AiProvider {
     const fallback: Record<string, unknown> = { string: 'Example', number: 1, boolean: true, color: '#22d3ee' };
     const variables = Object.fromEntries(fields.map(field => [field.name, { type: field.type, default: field.example === undefined ? fallback[field.type] : JSON.parse(field.example) }]));
     const layers: any[] = [
-      { id: 'glow', type: 'circle', x: width * 0.5, y: height * 0.35, width: Math.round(width * 0.9), fill: { type: 'radial', center: [0, 0], radius: Math.round(width * 0.45), stops: [{ offset: 0, color: 'rgba(34,211,238,0.22)' }, { offset: 1, color: 'rgba(34,211,238,0)' }] },
-        animations: [{ property: 'y', keyframes: [{ frame: 0, value: height * 0.35 }, { frame: duration, value: height * 0.38, easing: 'drift' }] }] },
+      { id: 'glow', type: 'circle', x: width * 0.5, y: height * 0.35, width: Math.round(width * 0.9), fill: { type: 'radial', center: [0, 0], radius: Math.round(width * 0.45), stops: [{ offset: 0, color: 'rgba(34,211,238,0.22)' }, { offset: 1, color: 'rgba(34,211,238,0)' }] } },
       { id: 'title', type: 'text', content: fields.length ? fields.map(field => `{{${field.name}}}`).join(' · ') : 'Mock video', x: width / 2, y: height * 0.4, fontFamily: 'Inter', fontSize: Math.round(width * 0.09), fontWeight: 800, color: '#f5f7fb', textAlign: 'center', maxWidth: width * 0.85, letterSpacing: -2, split: { by: 'words', stagger: 4, preset: 'rise' },
         animations: [{ property: 'opacity', keyframes: [{ frame: 0, value: 0 }, { frame: 18, value: 1, easing: 'land' }] }] },
       { id: 'sub', type: 'text', content: 'Set GROQ_API_KEY for real output.', x: width / 2, y: height * 0.74, fontFamily: 'Inter', fontSize: Math.round(width * 0.03), color: '#97a0b6', textAlign: 'center', maxWidth: width * 0.8 },
@@ -633,7 +632,14 @@ export class MockProvider implements AiProvider {
     const camera = (frames: number) => ({ x: width / 2, y: height / 2, zoom: 1, animations: [{ property: 'zoom', keyframes: [{ frame: 0, value: 1 }, { frame: frames, value: 1.06, easing: 'drift' }] }] });
     const glow = layers[0], title = { ...layers[1], split: { by: 'words', stagger: 4, preset: 'rise' } }, sub = layers[2];
     const long = duration >= fps * 8;
-    const scene = (id: string, name: string, start: number, frames: number, extra: any[] = []) => ({ id, name, startFrame: start, durationFrames: frames, camera: camera(frames), layers: [glow, { ...title, y: height * 0.36 }, { ...sub, y: height * 0.74 }, ...extra] });
+    const scene = (id: string, name: string, start: number, frames: number) => ({
+      id, name, startFrame: start, durationFrames: frames, camera: camera(frames),
+      layers: [
+        { ...glow, animations: [{ property: 'y', keyframes: [{ frame: 0, value: height * 0.35 }, { frame: frames, value: height * 0.38, easing: 'drift' }] }] },
+        { ...title, y: height * 0.36 },
+        { ...sub, y: height * 0.74 },
+      ],
+    });
     const scenes = long
       ? (() => { const a = Math.round(duration * 0.22), b = Math.round(duration * 0.46), c = duration - a - b; return [scene('hook', 'Hook', 0, a), scene('point', 'Point', a, b), scene('payoff', 'Payoff', a + b, c)]; })()
       : [scene('main', 'Main', 0, duration)];
@@ -759,7 +765,7 @@ function createBaseProvider(config: ProviderConfig = {}): AiProvider {
   // Nothing configured and nothing but the gateway default to choose: a request here would carry no credential, so
   // say so and hand back the offline provider rather than failing at the endpoint minutes into a render.
   if ((id === 'groq' || id === 'freellmapi') && !explicit && !configured.apiKey) {
-    console.warn('No AI provider is configured (set GROQ_API_KEY, or FREELLMAPI_API_KEY, or pass --provider): using the offline mock, which writes placeholder videos and makes no requests.');
+    console.warn('No AI provider is configured (set GROQ_API_KEY or FREELLMAPI_API_KEY, or pass --provider). The offline mock can generate JSON placeholders.');
     return new MockProvider();
   }
   return configured;

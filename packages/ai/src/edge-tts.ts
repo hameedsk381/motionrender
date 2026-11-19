@@ -379,6 +379,7 @@ async function synthesizeEdgeSpeechOnce(text: string, options: EdgeSpeechOptions
   });
 
   const mp3 = Buffer.concat(audioBuffers);
+  if (!mp3.length) throw new Error('The Edge voice service returned no audio. Check the voice and try again.');
 
   // Edge answers with MP3; the mixer and scene-by-scene voiceover both want a plain WAV container.
   const wav = await toWav(mp3).catch(() => undefined);

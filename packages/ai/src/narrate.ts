@@ -9,6 +9,7 @@ import { probe } from '@ove/ffmpeg';
 import type { AiProvider, Transcript } from './providers';
 import { captionsStyle } from './captions';
 import { compositionRelative, validateTemplate } from './project';
+import { synthesizeEdgeSpeech } from './edge-tts';
 
 export type NarrateOptions = {
   text?: string;
@@ -91,27 +92,35 @@ export function narrationScene(composition: Composition, options: SceneOptions):
   return next;
 }
 
-export async function narrate(provider: AiProvider, options: NarrateOptions): Promise<NarrateResult> {
-  if (!provider.speak) throw new Error(`The ${provider.id} provider cannot make speech (or add a speak() adapter)`);
+/** Omit the provider to speak a written script with Edge and use its word timings directly. */
+export async function narrate(provider: AiProvider | undefined, options: NarrateOptions): Promise<NarrateResult> {
+  if (provider && !provider.speak) throw new Error(`The ${provider.id} provider cannot make speech (or add a speak() adapter)`);
   const brief = options.brief?.trim();
   const scripted = options.content ?? options.composition?.content;
   let text = options.text?.trim() ?? (scripted ? narrationText(scripted) : '');
   if (!text && brief) {
+    if (!provider) throw new Error('Writing a narration from --brief needs a text model. Pass a script file to use Edge voices with no AI key.');
     options.onProgress?.('Writing the narration script…');
     text = await writeNarrationScript(provider, brief, { durationSeconds: options.durationSeconds, language: options.language, signal: options.signal });
   }
   if (!text) throw new Error('Nothing to narrate: pass a script file or --brief "what the video is about"');
   await mkdir(options.outDir, { recursive: true });
-  options.onProgress?.('Synthesising speech…');
-  const audio = await provider.speak(text, { voice: options.voice, language: options.language, signal: options.signal });
+  options.onProgress?.(provider ? 'Synthesising speech…' : 'Synthesising speech with Edge…');
+  const speechOptions = { voice: options.voice, language: options.language, signal: options.signal };
+  const edge = provider ? undefined : await synthesizeEdgeSpeech(text, speechOptions);
+  const audio = edge ?? await provider!.speak!(text, speechOptions);
   const audioFile = join(options.outDir, `narration.${audio.extension}`);
   await writeFile(audioFile, audio.data);
-  options.onProgress?.('Transcribing for word timings…');
-  let transcript: Transcript = { text: '', words: [], cues: [] };
-  if (!provider.transcribe) {
-    options.onProgress?.('This provider cannot transcribe, so captions are skipped.');
-  } else {
-    transcript = await provider.transcribe(audio.data, `narration.${audio.extension}`, { language: options.language, signal: options.signal });
+  let transcript: Transcript = edge?.transcript ?? { text: '', words: [], cues: [] };
+  if (provider) {
+    if (provider.transcribe) {
+      options.onProgress?.('Transcribing for word timings…');
+      transcript = await provider.transcribe(audio.data, `narration.${audio.extension}`, { language: options.language, signal: options.signal });
+    } else {
+      options.onProgress?.('This provider cannot transcribe, so captions are skipped.');
+    }
+  } else if (options.captions !== false && !transcript.words.length && !transcript.cues.length) {
+    options.onProgress?.('Edge returned speech without timings, so captions are skipped.');
   }
   let durationSeconds = endOf(transcript);
   if (!durationSeconds) {

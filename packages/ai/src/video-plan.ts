@@ -1,9 +1,8 @@
 // The Markdown-first director. It asks a model for semantic intent, never renderer coordinates,
 // then validates and reviews that plan before handing it to the deterministic compiler.
-import { formatVideoMarkdown, reviewVideoPlan, sceneCatalogMarkdown, type VideoPlanReviewIssue } from '@ove/core';
+import { formatVideoMarkdown, parseVideoMarkdown, reviewVideoPlan, type VideoPlanReviewIssue } from '@ove/core';
 import { videoPlanSchema, type VideoPlan } from '@ove/schema';
 import type { DesignHandoff, SceneInput } from '@ove/schema';
-import { extractJson } from './json';
 import type { AiProvider, ChatMessage } from './providers';
 
 export type DirectVideoPlanOptions = {
@@ -32,18 +31,33 @@ const idFor = (brief: string) => brief.toLowerCase().replace(/[^a-z0-9]+/g, '-')
 
 export function directorPrompt(brief: string, options: DirectVideoPlanOptions = {}): ChatMessage[] {
   const width = options.width ?? 1920, height = options.height ?? 1080, fps = options.fps ?? 30, duration = options.durationSeconds ?? 15;
-  const skeleton = {
-    version: '1.0', kind: 'video-plan', id: idFor(brief), name: 'Short human title',
-    brief: { prompt: brief, audience: options.audience, goal: options.goal, targetDurationSeconds: duration },
-    format: { width, height, fps },
-    beats: [{ id: 'hook', intent: 'The communication job of this beat', durationSeconds: 3, onScreen: 'The short words a viewer reads', narration: 'Optional spoken line', visual: { direction: 'A concrete visual idea, not coordinates', transition: 'cut' } }],
-  };
+  const skeleton = `---
+id: ${idFor(brief)}
+title: Short human title
+width: ${width}
+height: ${height}
+fps: ${fps}
+---
+
+# What this beat communicates
+ID: beat-one
+Duration: 3s
+Scene: kinetic-hook
+On-screen: Short words the viewer reads
+Visual: A concrete visual idea
+Visible: What is on screen
+Change: What moves
+Takeaway: What the viewer learns
+Moment: 0.65`;
   return [{ role: 'system', content: [
     'You are MotionRender\'s video director. Turn a creative brief into a concise semantic video plan.',
-    'Reply with one JSON object only. This plan is authored by people and agents; it must describe narrative intent and visual direction, never pixels, layers, keyframes, CSS, or code.',
-    `Use this exact contract shape (add beats as appropriate):\n${JSON.stringify(skeleton, null, 2)}`,
-    `The total of durationSeconds must be about ${duration} seconds. Use 3–7 purposeful beats: hook, development/proof, and a decisive ending.`,
-    `Each beat needs a stable kebab-case id, an intent (the communication job), short onScreen copy where useful, optional narration, and a concrete visual.direction. Include a storyboard object with visible, change, takeaway (one short line each), and moment (fraction of this beat at which to inspect the action). Select visual.scene from this catalog when a shape fits; satisfy its required inputs. Use varied transitions sparingly.\n${sceneCatalogMarkdown()}`,
+    'Reply in Markdown only. Describe the story and visible action. Omit coordinates, CSS, code, file references and JSON.',
+    `Use these labelled lines, with one level-one heading per beat:\n${skeleton}`,
+    `Keep total duration around ${duration} seconds. Choose the beats that serve this brief. When asked for one scene, return one beat with no separate title or closing beat.`,
+    'Use Scene: route for ordered trips and skipped stops. If paths share a destination and one visits an intermediate stop, keep the whole path of each trip in one route beat. Example scene lines: Scene: route; Trip: Local | A → B → C; Trip: Express | A → C. Optional Variant: rail or map.',
+    'Use Scene: split only when one source reaches two different endpoints simultaneously. Write Origin: Tap and two Branch: destination | direction lines. Directions are left, right, down, down-left and down-right. Optional Variant: fork or manifold.',
+    'Use Scene: fold for a printed sheet closing. Write Inside: printed title and Cover: printed title. Optional Variant: sheet or booklet.',
+    'For Scene: workflow, write three Step: short label lines. For Scene: before-after, write Before: and After:. For kinetic-hook and decisive-cta, use short On-screen: copy. Use an optional Narration: line for speech. Moment is an inspection fraction between zero and one.',
     'Do not invent facts, dates, customer results, or statistics. Unless the user supplied verified sources, omit claim, data, sources and sourceIds entirely. Do not fake citations.',
     'Choose a visual world specific to the brief rather than defaulting to dark gradients or generic glass cards. Keep copy readable and make the first beat visually active.',
   ].join('\n') }, { role: 'user', content: `Direct this video:\n${brief.trim()}${options.audience ? `\nAudience: ${options.audience}` : ''}${options.goal ? `\nGoal: ${options.goal}` : ''}` }];
@@ -56,17 +70,19 @@ export async function directVideoPlan(provider: AiProvider, brief: string, optio
   let feedback = '', last = '';
   for (let attempt = 1; attempt <= limit; attempt++) {
     options.onProgress?.(attempt === 1 ? `Directing the video with ${provider.id}…` : `Refining the semantic plan (attempt ${attempt}/${limit})…`);
-    const reply = await provider.chat(messages, { json: true, task: 'direct', temperature: attempt === 1 ? 0.7 : 0.25, maxTokens: 2400, signal: options.signal });
+    const reply = await provider.chat(messages, { task: 'direct', temperature: attempt === 1 ? 0.7 : 0.25, maxTokens: 2400, signal: options.signal });
     let parsed: VideoPlan;
     try {
-      const raw = extractJson(reply);
-      const candidate = raw && typeof raw === 'object' ? { ...raw as object, version: '1.0', kind: 'video-plan', brief: { prompt: brief, targetDurationSeconds: options.durationSeconds ?? 15, ...(raw as any).brief }, format: { width: options.width ?? 1920, height: options.height ?? 1080, fps: options.fps ?? 30, ...(raw as any).format } } : raw;
-      const checked = videoPlanSchema.safeParse(candidate);
-      if (!checked.success) throw checked.error;
-      parsed = checked.data;
+      const markdown = /^\s*```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/i.exec(reply)?.[1] ?? reply.trim();
+      const plan = parseVideoMarkdown(markdown);
+      parsed = videoPlanSchema.parse({
+        ...plan,
+        brief: { ...plan.brief, prompt: brief, targetDurationSeconds: options.durationSeconds ?? 15, audience: options.audience ?? plan.brief.audience, goal: options.goal ?? plan.brief.goal },
+        format: { width: options.width ?? 1920, height: options.height ?? 1080, fps: options.fps ?? 30 },
+      });
     } catch (error) {
       feedback = `The plan is not valid:\n${issues(error)}`; last = feedback;
-      messages.push({ role: 'assistant', content: reply }, { role: 'user', content: `${feedback}\nReply with the corrected JSON object only.` });
+      messages.push({ role: 'assistant', content: reply }, { role: 'user', content: `${feedback}\nReply with the complete corrected Markdown plan.` });
       continue;
     }
     const review = reviewVideoPlan(parsed);
@@ -74,7 +90,7 @@ export async function directVideoPlan(provider: AiProvider, brief: string, optio
     if (!warnings.length || attempt === limit) return { plan: parsed, markdown: formatVideoMarkdown(parsed), review, attempts: attempt };
     feedback = `The plan passes the schema but needs this editorial repair before production:\n${warnings.map(issue => `- ${issue.beatId ? `[${issue.beatId}] ` : ''}${issue.message}`).join('\n')}`;
     last = feedback;
-    messages.push({ role: 'assistant', content: reply }, { role: 'user', content: `${feedback}\nKeep the brief and evidence rules. Reply with the repaired JSON object only.` });
+    messages.push({ role: 'assistant', content: reply }, { role: 'user', content: `${feedback}\nKeep the brief and evidence rules. Reply with the complete repaired Markdown plan.` });
   }
   throw new Error(`The director could not produce a usable video plan after ${limit} attempts:\n${last}`);
 }

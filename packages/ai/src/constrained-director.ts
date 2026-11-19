@@ -1,4 +1,4 @@
-import { sceneInputSchema, videoPlanSchema, type SceneInput } from '@ove/schema';
+import { explainerKindDocs, sceneInputSchema, videoPlanSchema, type SceneInput } from '@ove/schema';
 import { formatVideoMarkdown, reviewVideoPlan } from '@ove/core';
 import { extractJson } from './json';
 import type { AiProvider, ChatMessage } from './providers';
@@ -20,12 +20,17 @@ export async function directConstrainedVideo(provider: AiProvider, brief: string
   const inputs: SceneInput[] = []; let attempts = 0;
   for (const role of roles) {
     const storyboard = options.story?.beats.find(beat => beat.id === role.id)?.storyboard;
-    const examples = role.allowed.some(scene => scene === 'workflow' || scene === 'before-after')
+    const foldExample = { ...explainerKindDocs.find(doc => doc.kind === 'fold')!.example, kind: undefined, type: 'fold', headline: 'Cover reveal', layout: 'sheet', choreography: 'hinge' };
+    const splitExample = { ...explainerKindDocs.find(doc => doc.kind === 'split')!.example, kind: undefined, type: 'split', headline: 'Two branches', layout: 'fork', choreography: 'trace' };
+    const examples = role.allowed.includes('fold') ? JSON.stringify(foldExample) : role.allowed.includes('split') ? JSON.stringify(splitExample) : role.allowed.includes('route') ? JSON.stringify({ ...explainerKindDocs.find(doc => doc.kind === 'route')!.example, kind: undefined, type: 'route', headline: 'Short headline', layout: 'map', choreography: 'trace' }) : role.allowed.some(scene => scene === 'workflow' || scene === 'before-after')
       ? 'Either {"type":"workflow","headline":"A short headline","steps":["First step","Next step","Last step"]} or {"type":"before-after","before":"Old state","after":"New state"}. Each step: at most 3 words. Before/after: at most 6 words each. Use before-after only when the brief supplies both states.'
       : `{"type":"${role.allowed[0]}","headline":"A short headline"}. No other fields.`;
     const messages: ChatMessage[] = [{ role: 'system', content: `Write ONE scene input as JSON. Allowed type: ${role.allowed.join(' or ')}. Headline: at most 9 words. These word limits are mandatory. Exact shapes: ${examples} Replace example text with content from the brief. Do not repeat schema definitions. Do not produce code, positions, timing, narration, citations, or numeric performance claims. Do not invent problems, deficiencies, benefits, or services. Use positive descriptive copy grounded only in supplied facts.` }, { role: 'user', content: `Brief: ${brief}\nAudience: ${options.audience ?? 'general'}\nGoal: ${options.goal ?? 'explain the idea'}\nDesign direction: ${JSON.stringify(options.story?.design ?? {})}\nScene job: ${role.intent}\nEarlier scenes: ${JSON.stringify(inputs)}` }];
     if (storyboard) messages[1]!.content += `\nDraw this storyboard using the scene copy, layout and choreography: ${JSON.stringify(storyboard)}`;
-    messages[0]!.content += ' You may add layout and choreography fields. Layout choices: kinetic-hook=editorial|poster|split; workflow=horizontal|vertical|radial|branch (one source feeding two outcomes); before-after=split|stacked; decisive-cta=centered|corner|banner. Choreography=reveal (together), cascade (stagger), trace (connections grow). Select the combination that serves this beat; vary spatial arrangements across the story. Do not treat a new palette as a new layout.';
+    messages[0]!.content += ' You may add layout and choreography fields. Layout choices: fold=sheet with hinge; split=fork with trace (directions left/right/down/down-left/down-right); route=map with trace (cue names a trip and stop; use one-based visit to distinguish repeat calls); kinetic-hook=editorial|poster|split; workflow=horizontal|vertical|radial|branch (one source feeding two outcomes); before-after=split|stacked; decisive-cta=centered|corner|banner. For fold use hinge; other choreography=reveal (together), cascade (stagger), trace (connections grow). Select the combination that serves this beat; vary spatial arrangements across the story. Do not treat a new palette as a new layout.';
+    if (role.allowed.some(kind => kind === 'route' || kind === 'split' || kind === 'fold')) {
+      messages[0]!.content += ' For action scenes, optionally set variant: route map or rail (ordered line and raised bypass), split fork or manifold (shared trunk and right-angle branches), fold sheet or booklet (wide cover and pause at the crease).';
+    }
     if (options.story) messages[0]!.content += ' For this designed story, layout and choreography are REQUIRED on every scene input.';
     let accepted = false, last = '';
     for (let attempt = 0; attempt < limit; attempt++) {

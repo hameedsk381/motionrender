@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 try { process.loadEnvFile?.(); } catch { /* .env is optional */ }
 import { explainerJsonSchema } from '@ove/schema'; import { readFile, writeFile } from 'node:fs/promises'; import { resolve, dirname, join } from 'node:path'; import { prepareComposition, reviewComposition, measureMedia, captionTrack, formatCaptions, compositionJsonSchema, variablesSchema, resolveVariables, interpolate, describeError, outputFormats, renderMedia, renderStill, defaultConcurrency, x264Presets, defaultPreset, checkFfmpeg, describeBrowser, ffprobePath, renderDistributed, httpWorker, cacheUsage, cleanCache, ensureChromium, adaptCompositionAspect, importFigmaTokens, importFigmaFrame, fetchFigmaFile, type Composition, type OutputFormat, type X264Preset } from '@ove/core'; import { initProject } from './init'; import { checkArgs, wantsHelp, wantsVersion } from './args'; import { startDevServer } from './dev'; import { startWorker } from './worker'; import { spawnSync } from 'node:child_process'; 
+const launchReelUsage = `mr launch-reel <url|image.png> [--name "Name"] [--brand "#38bdf8"]
+    [--style keynote|terminal|editorial|blueprint|neon|bento] [--engine react|json] [--aspect 9:16|16:9|1:1]
+    [--tagline "Verified description"] [--cta "Your call to action"] [--shot screenshot.png] [--output-dir project]
+    [--voice voice-name|--no-voice] [--draft|--final|--render] [--out video.mp4]`;
+
 const usage = `MotionRender: JSON-first, frame-deterministic motion graphics video engine.
 
 Usage:
@@ -18,7 +23,8 @@ Commands:
   mr blocks [--json]             list the ready-made scenes and overlays and the themes
   mr add <block> <composition.json> [--set name=value] [--at frame] [--scene id]   copy a block into a video (creates the file if it is new: --aspect 9:16 --theme neon)
   mr theme [id] [composition.json]   list themes, or switch a composition to one
-  mr launch-reel <url|image.png> [--name "App"] [--brand "#38bdf8"] [--style keynote|terminal|editorial|blueprint|neon|bento] [--engine react|json] [--aspect 9:16|16:9|1:1] [--voice] [--out video.mp4]   generate a 15s kinetic launch video from a website or screenshot
+  ${launchReelUsage}
+    Prepare an editable 15-second reel from a website or screenshot. Review the copy and capture before publishing.
   mr serve                       the studio for many people (sign-in, Postgres, Redis); settings come from the environment, see docs/hosting.md
   mr job-worker                  runs queued jobs for mr serve (JOB_LANE=render|ai)
   mr worker [--port 4400] [--host 127.0.0.1] [--token T] [--concurrency n]   render chunks for other machines
@@ -34,7 +40,7 @@ Commands:
   mr script <composition.json> --set script.json   replace the script in a video (validated against its sources)
   mr production validate <production.json> [--json]   check a production manifest: cast, references, shots and script links
   mr production compile <production.json> [--output composition.json]   compile the shot list into a renderable composition
-  mr make <explainer.json|composition.json> [--draft|--final] [--no-voice] [--output file.mp4] [--json]   check, build, review and render in one go (the quickest loop for an agent)
+  mr make <video.md|explainer.json|composition.json> [--draft|--final] [--no-voice] [--output file.mp4] [--json]   check, build, review and render in one go
   mr explainer write "<what to explain>" [--scenes N] [--language L]   the AI writes the explainer script
   mr explainer kinds [--json] | looks [--json] | example [--output explainer.json]   what each scene kind shows, with a valid example (no AI needed to write a script)
   mr explainer validate|compile <explainer.json> [--output composition.json] [--no-voice] [--voice <name>]   an explainer script (scenes + spoken lines) into a video
@@ -176,7 +182,7 @@ Press Ctrl+C to stop.`);
     }
   }
   else if (command === 'launch-reel') {
-    if (!file || file.startsWith('--')) throw new Error('Usage: mr launch-reel <url|image.png> [--name "App"] [--brand "#38bdf8"] [--style keynote|terminal|editorial|blueprint|neon|bento] [--engine react|json] [--aspect 9:16|16:9|1:1] [--voice] [--out video.mp4]');
+    if (!file || file.startsWith('--')) throw new Error('Usage: ' + launchReelUsage);
     const { createLaunchReel } = await import('@ove/ai');
     const { buildReact } = await import('./build');
     const engine = (option('--engine') as any) ?? 'react';
@@ -190,6 +196,7 @@ Press Ctrl+C to stop.`);
       voice: flag('--no-voice') ? false : (option('--voice') ?? true),
       tagline: option('--tagline'),
       ctaText: option('--cta'),
+      screenshot: option('--shot'),
       outputDir: option('--output-dir'),
       buildHelper: buildReact,
       onProgress: msg => console.log(msg),

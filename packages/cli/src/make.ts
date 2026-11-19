@@ -47,8 +47,14 @@ export const draftSettings = { scale: 0.5, preset: 'ultrafast' as const, crf: 32
 export async function makeVideo(options: MakeOptions): Promise<MakeResult> {
   const log = options.log ?? (() => {}), file = resolve(options.file), dir = dirname(file), timings: Record<string, number> = {}, notes: string[] = [];
   let started = Date.now();
-  const raw = extname(file).toLowerCase() === '.md' ? parseVideoMarkdown((await readFile(file, 'utf8')).replace(/^﻿/, '')) : await readJson(file), kind = kindOfFile(raw);
+  let raw: unknown, kind: MakeResult['kind'] = extname(file).toLowerCase() === '.md' ? 'video-plan' : 'composition';
   const fail = (problems: string[]): MakeResult => ({ ok: false, kind, problems, notes, timings, next: ['Fix the problems listed and run make again.'] });
+  try { raw = kind === 'video-plan' ? parseVideoMarkdown(await readFile(file, 'utf8')) : await readJson(file); }
+  catch (error) {
+    const issues = (error as { issues?: { path: PropertyKey[]; message: string }[] }).issues;
+    return fail(issues?.map(issue => `${issue.path.join('.') || 'plan'}: ${issue.message}`) ?? [(error as Error).message]);
+  }
+  kind = kindOfFile(raw);
 
   // 1. Check and build.
   let compositionPath = file, composition: Composition, plan: any, spoken: number | undefined, reacted = false, scriptScenes: number | undefined;

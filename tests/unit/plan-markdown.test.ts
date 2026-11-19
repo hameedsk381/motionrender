@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatVideoMarkdown, parseVideoMarkdown } from '@ove/core';
+import { compileVideoPlan, formatVideoMarkdown, parseVideoMarkdown } from '@ove/core';
 
 const markdown = `---
 id: launch
@@ -35,5 +35,59 @@ describe('semantic plan Markdown', () => {
     expect(output).toContain('> Variable customer: string = Acme');
     expect(output).toContain('Scene: proof-stat');
     expect(parseVideoMarkdown(output).beats[0]?.claim).toBe('Teams resolved requests 42% faster.');
+  });
+
+  it('round trips action scenes and a trusted React bundle without inline JSON', () => {
+    const plans = `---
+title: Three actions
+format: 432x768
+---
+> React [custom]: ./custom.bundle.js
+
+# Compare train stops
+Scene: route
+Variant: rail
+- Trip: Express | Central → Harbor
+- Trip: Local | Central -> Market -> Harbor
+Arrival: Express arrival | Express → Harbor
+
+# Water both beds
+Scene: split
+Origin: Tap
+Branch: Herbs | down-left
+Branch: Tomatoes | down-right
+
+# Close the booklet
+Scene: fold
+Variant: booklet
+Inside: Ensemble
+Cover: Night Shift
+
+# End card
+Module: custom
+On-screen: Finished
+`;
+    const plan = parseVideoMarkdown(plans);
+    expect(plan.beats[0]!.visual.input).toMatchObject({ stops: ['Central', 'Harbor', 'Market'], trips: [{ via: ['Central', 'Harbor'] }, { via: ['Central', 'Market', 'Harbor'] }] });
+    expect(plan.format).toMatchObject({ width: 432, height: 768 });
+    const output = formatVideoMarkdown(plan);
+    expect(output).not.toContain('Scene-input:');
+    expect(parseVideoMarkdown(output)).toEqual(plan);
+    const { composition } = compileVideoPlan(plan);
+    expect(composition.scenes.map(scene => scene.layers.some(layer => layer.type === 'react'))).toEqual([false, false, false, true]);
+  });
+
+  it('points at the beat when an action line is malformed', () => {
+    expect(() => parseVideoMarkdown('# Compare trains\nScene: route\nTrip: Express Central → Harbor\n'))
+      .toThrow('Beat "Compare trains": Trip needs a name | Stop → Stop');
+  });
+
+  it('uses plain copy directives for a workflow and a before-and-after comparison', () => {
+    const plan = parseVideoMarkdown('# A request\nScene: workflow\nStep: Send\nStep: Check\nStep: Reply\n\n# Compare outcomes\nScene: before-after\nBefore: Manual review\nAfter: Automatic routing\n');
+    expect(plan.beats.map(beat => beat.visual.input)).toMatchObject([
+      { type: 'workflow', steps: ['Send', 'Check', 'Reply'] },
+      { type: 'before-after', before: 'Manual review', after: 'Automatic routing' },
+    ]);
+    expect(parseVideoMarkdown(formatVideoMarkdown(plan))).toEqual(plan);
   });
 });

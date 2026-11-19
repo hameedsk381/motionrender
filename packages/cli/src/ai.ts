@@ -6,6 +6,7 @@ import { mergeNarration, ensureBaseline, listRevisions, restoreRevision, saveRev
 import { captionAudio, composeVideo, compositionRelative, createProvider, describeProvider, editVideo, fieldsFromRows, generateImage, narrate, planBatch, providerCapabilities,
   refineVideo, renderBatch, shortsFrom, writeCompositionProject, type BatchSettings, type ComposeOptions, type ProviderConfig } from '@ove/ai';
 import { describeError, loadComposition, renderMedia, type Composition } from '@ove/core';
+import { narrationText } from '@ove/schema';
 import { composeSmart } from './compose-source';
 import { readScript } from './script';
 import { convertFileToReact } from './react-compose';
@@ -27,8 +28,10 @@ const usage = `Usage:
       [--strict]    refuse an answer that only works because we repaired it (invented animation properties, unusable
                     keyframes); by default those repairs are made and listed as notes
   ove ai refine <composition.json> --instruction "..." [--review] [--dry-run]
-  ove ai narrate <script.txt> [--composition video.json] [--out dir] [--voice Puck] [--language en] [--tail 0.8]
-  ove ai narrate --brief "..." [--duration 20] [--composition video.json]
+  ove ai narrate <script.txt> [--composition video.json] [--out dir] [--voice en-US-AvaNeural] [--language en] [--tail 0.8]
+      Speaks a written script with Edge and writes word timings. Internet access required. No AI key.
+  ove ai narrate --composition video.json            speak the composition's existing content script
+  ove ai narrate --brief "..." [--duration 20] [--composition video.json]   write a script using a text model, then speak it
   ove ai transcribe <audio> [--composition video.json] [--out dir] [--language en] [--start 0]
   ove ai edit <clip.mp4> --out reel-dir [--max-silence 0.5] [--keep-fillers] [--width 1080] [--height 1920]
       [--fps 30] [--no-captions] [--language en] [--force]
@@ -41,8 +44,8 @@ const usage = `Usage:
       [--duration 18] [--fps 30] [render options]
   ove ai studio [--port 3100] [--out ai-videos]   open a local page for the AI commands in a browser
 
-Provider options (all commands): --provider groq|freellmapi|openai|anthropic|google|openrouter|mock (default: groq), --model name, --base-url URL
-Environment: OVE_AI_PROVIDER, OVE_AI_MODEL, OVE_AI_API_KEY, GROQ_API_KEY, FREELLMAPI_API_KEY, FREELLMAPI_BASE_URL. Narration uses the free Edge voices (internet needed, no key).
+Provider options: --provider groq|freellmapi|openai|anthropic|google|openrouter|mock (default: groq), --model name, --base-url URL
+Environment: OVE_AI_PROVIDER, OVE_AI_MODEL, OVE_AI_API_KEY, GROQ_API_KEY, FREELLMAPI_API_KEY, FREELLMAPI_BASE_URL.
 Render options: --crf, --bitrate, --audio-bitrate, --scale, --loudness, --concurrency, --preset, --codec, --format`;
 
 const option = (argv: string[], name: string) => { const index = argv.indexOf(name); return index < 0 ? undefined : argv[index + 1]; };
@@ -229,10 +232,9 @@ async function composeCommand(argv: string[]): Promise<number> {
     const source = (result as any).source ? (narration ? mergeNarration((result as any).source, composition) : (result as any).source) : undefined;
   // The React route has already put video.tsx and its bundle in the folder, which the check at the top found empty (or --force allowed).
   const files = await writeCompositionProject(dir, composition, { force: flag(argv, '--force') || result.route === 'react', source });
-  // Every video is a React video: a composition the block catalogue or the scene-by-scene route produced is drawn by the shared
-  // CompositionView, so the saved file is one `react` layer like a model-written one. What the view cannot draw yet keeps its JSON layers,
-  // and the note says why. `--json-layers` keeps the layers on purpose (what the hosted worker renders, or hand-editing the JSON).
-  if (result.route !== 'react' && !flag(argv, '--json-layers')) {
+  // For model-written output, the shared CompositionView can draw a compatible JSON composition as one React layer.
+  // Keep the original JSON when the user asks for it, the offline mock is active, or conversion is unsupported.
+  if (result.route !== 'react' && provider.id !== 'mock' && !flag(argv, '--no-react') && !flag(argv, '--json-layers')) {
     try {
       const converted = await convertFileToReact(files.composition);
       if (converted.unsupported.length) result.warnings.push(`Kept as JSON layers, because the React view cannot draw yet: ${converted.unsupported.join(', ')}.`);
@@ -295,9 +297,8 @@ async function refineCommand(argv: string[]): Promise<number> {
 async function narrateCommand(argv: string[]): Promise<number> {
   const source = argv[2] && !argv[2].startsWith('--') ? argv[2] : undefined;
   const brief = option(argv, '--brief');
-  if (!source && !brief) throw new Error('ove ai narrate needs a script file or --brief "what the video is about"');
-  const provider = providerFrom(argv);
   const compositionPath = option(argv, '--composition');
+  if (!source && !brief?.trim() && !compositionPath) throw new Error('ove ai narrate needs a script file, a composition with a content script, or --brief "what the video is about"');
   let composition: Composition | undefined;
   let baseDir = process.cwd();
   if (compositionPath) {
@@ -305,13 +306,15 @@ async function narrateCommand(argv: string[]): Promise<number> {
     composition = await readJson(compositionPath) as Composition;
     baseDir = dirname(resolve(compositionPath));
   }
-  const text = source ? await readFile(resolve(source), 'utf8') : undefined;
+  const text = source ? await readFile(resolve(source), 'utf8') : composition?.content ? narrationText(composition.content) : undefined;
+  const provider = !text?.trim() && brief?.trim() ? providerFrom(argv) : undefined;
+  if (provider?.id === 'mock') throw new Error('Writing a narration from --brief needs a configured text model. Pass a script file to use Edge voices with no AI key.');
   const outDir = resolve(option(argv, '--out') ?? resolve(baseDir, 'assets'));
   const produced = await narrate(provider, { text, brief, outDir, composition, compositionPath: compositionPath ? resolve(compositionPath) : undefined,
     voice: option(argv, '--voice'), language: option(argv, '--language'), durationSeconds: numberOption(argv, '--duration', 20),
     tailSeconds: numberOption(argv, '--tail', 0.8), captions: !flag(argv, '--no-captions'), onProgress: message => console.log(message) });
   if (produced.composition && compositionPath) {
-    await trackedWrite(resolve(compositionPath), produced.composition, { kind: 'edit', label: 'Narration added', provider: provider.id, model: provider.model });
+    await trackedWrite(resolve(compositionPath), produced.composition, { kind: 'edit', label: 'Narration added', provider: provider?.id ?? 'edge', model: provider?.model });
     console.log(`Updated ${resolve(compositionPath)} with the narration scene`);
   }
   console.log(`\nAudio: ${produced.audio} (${produced.durationSeconds.toFixed(2)} s)`);
@@ -466,7 +469,7 @@ function doctorCommand(argv: string[]): number {
   if (provider.id === 'groq' && !provider.apiKey) console.log('  Groq needs GROQ_API_KEY (or OVE_AI_API_KEY); requests fail without it.');
   if (provider.id === 'freellmapi' && !provider.apiKey) console.log('  The gateway needs FREELLMAPI_API_KEY (or OPENAI_API_KEY / OVE_AI_API_KEY); requests fail without it.');
   console.log(`\n${describeProvider(provider)}`);
-  if (!capabilities.speech) console.log('  Narration needs speech: only an offline mock runs without it — set a key, or pass --provider.');
+  if (!capabilities.speech) console.log('  To speak a written script, use mr ai narrate script.txt with Edge. Generating a script from a brief requires a text model.');
   if (!capabilities.image) console.log('  Images need a provider with image generation; the Groq adapter here has none, so use FreeLLMAPI, OpenAI or another (--provider), or supply pictures with --asset.');
   console.log('\nSet GROQ_API_KEY in .env (the default provider), or pass --provider.');
   return 0;

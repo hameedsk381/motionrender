@@ -31,6 +31,9 @@ export type WriteExplainerOptions = {
 };
 
 const GUIDE = `Scene kinds (each scene has a "kind", an optional "step" label in UPPER CASE such as "STEP 2 · HOW IT WORKS", and an optional "say" line that is spoken over it):
+- route: visits named stops in order across trips. {kind:"route", stops:[2-5 names], trips:[{name,via:[stop names]}], cue:{name,trip,stop,visit?}, variant?:"map"|"rail", say}. Use rail for an ordered line with a raised bypass, map for a network. A cue refers to a unique stop or a one-based visit.
+- split: branches from one origin to two simultaneous destinations. {kind:"split", origin, branches:[{endpoint,direction},{endpoint,direction}], variant?:"fork"|"manifold", say}. Directions are left, right, down, down-left, and down-right. Use fork for signals radiating out, manifold for flow through a common trunk with right-angle branches.
+- fold: closes an open printed sheet once to reveal its cover. {kind:"fold", inside, cover, artwork:"print"|"map", direction:"right-to-left"|"left-to-right", variant?:"sheet"|"booklet", say}. Use sheet for a tall cover and continuous turn, booklet for a wider cover and a pause at the crease.
 - title: opens the video. {kind:"title", brand?:"big name", chip?:"SMALL BOXED LABEL", lines:[up to 3 short lines; the middle of three is large and gold], say}
 - flow: things sending to a destination through something in between. {kind:"flow", sources:[2-7 short ids like "App","D17"], buffer:"QUEUE", sink:"SERVER", spike?:"10× SPIKE", note?:{text,tone}, result?:{text:"0 LOST ✓",tone:"mint"}, caption?, say}
 - grid: a board of cells. mode "counters" shows a number in every cell and one changes; mode "heatmap" colours cells red (busy) to green (quiet). {kind:"grid", mode, rows?:3-9, cols?:3-8, hot?:{row,col}, callout?, result?:"name of the picture", resultNote?, caption?, say}

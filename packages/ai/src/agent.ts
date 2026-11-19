@@ -188,6 +188,7 @@ export async function runVideoAgent(
   options: AgentOptions,
   buildHelper?: (source: string, output: string) => Promise<void>
 ): Promise<AgentResult> {
+  if (provider.id === 'mock') throw new Error('React authoring requires a configured text model. For an offline JSON placeholder, run mr ai compose demo --provider mock --brief "Preview".');
   let activeBrief = options.brief?.trim() || '';
   let activeBrand = options.brand;
 

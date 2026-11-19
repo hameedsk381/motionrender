@@ -2,6 +2,9 @@
 // the kind of system-design, how-it-works and "explain it simply" videos people post as reels. This is its script: what each scene
 // is about and what is said over it, with no coordinates, colours or frame numbers. A compiler (compileExplainer in @ove/core) turns
 // it into a composition, so a person, a script or an AI can write the content and the pictures stay consistent and frame-exact.
+import { foldFields } from './fold';
+import { splitFields, validateSplit } from './split';
+import { routeFields, validateRoute } from './route';
 import { storyboardSchema } from './storyboard';
 import { z } from 'zod';
 
@@ -41,6 +44,9 @@ export const freeformElementSchema = z.discriminatedUnion('type', [
 ]);
 
 export const explainerSceneSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('fold'), ...common, ...foldFields }),
+  z.object({ kind: z.literal('split'), ...common, ...splitFields }).superRefine(validateSplit),
+  z.object({ kind: z.literal('route'), ...common, ...routeFields }).superRefine(validateRoute),
   z.object({ kind: z.literal('title'), ...common,
     brand: words(20).optional().describe('A big name at the top, such as the company or the subject'),
     chip: words(36).optional().describe('A small boxed label under it, such as "SYSTEM DESIGN INTERVIEW"'),
@@ -163,6 +169,7 @@ export const explainerSchema = z.object({
   series: words(24).default('EXPLAINED').describe('The small label before the topic in the header, such as "SYSTEM DESIGN", "HOW IT WORKS" or "MONEY BASICS"'),
   aspect: z.enum(['9:16', '1:1', '4:5', '16:9']).default('9:16').describe('The shape of the video. Scenes are drawn as a 9:16 column; other shapes show that column, scaled to fit, centred on the board'),
   music: z.enum(['none', 'calm', 'pulse']).default('calm').describe('A quiet music bed under the voice, lowered while it speaks: calm (soft chords) or pulse (the same with a slow heartbeat), or none. Needs the voice: a silent build has no bed.'),
+  silent: z.boolean().optional().describe('Build without narration, music, or sound effects.'),
   captions: z.boolean().default(true).describe('Spoken words drawn as captions near the bottom, the word being said highlighted. Needs the voice: a silent build has none.'),
   chapters: z.boolean().default(true).describe('A segmented progress bar and a "03 / 07" count, so the viewer always knows where they are'),
   sketch: z.boolean().default(false).describe('Draw the whole board by hand: wobbly outlines, redrawn every few frames like a cartoon'),
@@ -190,4 +197,4 @@ export type ExplainerInput = z.input<typeof explainerSchema>;
 export type ExplainerScene = z.infer<typeof explainerSceneSchema>;
 export type FreeformElement = z.infer<typeof freeformElementSchema>;
 /** The scene kinds, for prompts and menus. */
-export const explainerKinds = ['title', 'flow', 'grid', 'steps', 'compare', 'stat', 'chart', 'timeline', 'pile', 'media', 'phone', 'hex', 'quote', 'code', 'world', 'freeform', 'closing'] as const;
+export const explainerKinds = ['fold', 'split', 'route', 'title', 'flow', 'grid', 'steps', 'compare', 'stat', 'chart', 'timeline', 'pile', 'media', 'phone', 'hex', 'quote', 'code', 'world', 'freeform', 'closing'] as const;

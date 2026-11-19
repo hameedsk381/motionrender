@@ -28,6 +28,7 @@ export type LaunchReelOptions = {
   voiceName?: string;
   tagline?: string;
   ctaText?: string;
+  screenshot?: string;
   outputDir?: string;
   buildHelper?: (source: string, output: string) => Promise<void>;
   onProgress?: (message: string) => void;
@@ -49,10 +50,18 @@ const ASPECT_DIMS: Record<LaunchReelAspect, { width: number; height: number }> =
   '1:1': { width: 1080, height: 1080 },
 };
 
+export function launchReelTagline(description: string | undefined): string {
+  const text = description?.replace(/\s+/g, ' ').trim() ?? '';
+  if (text.length <= 90) return text;
+  const first = [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(text)][0]?.segment.trim();
+  return first && first.length <= 90 ? first : '';
+}
+
 /**
  * Creates a clean SVG placeholder image when a URL screenshot is unavailable or offline.
  */
 function createPlaceholderMockup(title: string, color: string, width = 1280, height = 720): Buffer {
+  const label = title.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
   const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -74,7 +83,7 @@ function createPlaceholderMockup(title: string, color: string, width = 1280, hei
     <!-- Mock Content Area -->
     <rect x="120" y="18" width="400" height="20" rx="10" fill="rgba(255,255,255,0.08)"/>
     <rect x="64" y="100" width="300" height="36" rx="8" fill="url(#accent)"/>
-    <text x="64" y="180" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="38" font-weight="bold">${title.slice(0, 32)}</text>
+    <text x="64" y="180" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="38" font-weight="bold">${label}</text>
     <rect x="64" y="220" width="600" height="16" rx="8" fill="rgba(255,255,255,0.2)"/>
     <rect x="64" y="250" width="450" height="16" rx="8" fill="rgba(255,255,255,0.15)"/>
     <!-- Mock Cards -->
@@ -127,14 +136,16 @@ async function captureWebsiteScreenshot(url: string, destinationFile: string, lo
 export async function createLaunchReel(options: LaunchReelOptions): Promise<LaunchReelResult> {
   const log = options.onProgress ?? (() => {});
   const input = options.urlOrImage.trim();
-  const isUrl = /^https?:\/\//i.test(input) || /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/i.test(input);
+  const isUrl = /^https?:\/\//i.test(input) || (
+    !/\.(?:png|jpe?g|webp|gif|avif|svg|bmp)$/i.test(input) && /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/i.test(input)
+  );
 
   const aspect = options.aspect ?? '9:16';
   const { width, height } = ASPECT_DIMS[aspect];
   const fps = 30;
   const durationFrames = 450; // 15 seconds
 
-  const targetName = options.name || (isUrl ? input.replace(/^https?:\/\//i, '').split('/')[0].split('.')[0] : basename(input, extname(input)));
+  let targetName = options.name || (isUrl ? new URL(normalizeUrl(input)).hostname.replace(/^www\./i, '') : basename(input, extname(input)));
   const projectSlug = targetName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'launch-reel';
   const projectDir = resolve(options.outputDir ?? join('ai-videos', `${projectSlug}-${Date.now().toString(36)}`));
   const assetsDir = join(projectDir, 'assets');
@@ -142,6 +153,7 @@ export async function createLaunchReel(options: LaunchReelOptions): Promise<Laun
 
   const screenshotPath = join(assetsDir, 'screenshot.png');
   let brandColor = options.brandColor ?? '#38bdf8';
+  if (!/^#[\da-f]{6}$/i.test(brandColor)) throw new Error('Launch reel brand color must be a six-digit hex value such as #38bdf8');
   let tagline = options.tagline;
   let metadata: ScrapedWebsite | { name: string; brandColor: string } = { name: targetName, brandColor };
 
@@ -151,17 +163,19 @@ export async function createLaunchReel(options: LaunchReelOptions): Promise<Laun
     try {
       const scraped = await scrapeWebsiteBrand(fullUrl);
       metadata = scraped;
-      if (!options.brandColor && scraped.colors.length > 0) {
-        brandColor = scraped.colors[0]!;
-      }
-      if (!tagline && scraped.description) {
-        tagline = scraped.description.slice(0, 90);
-      }
+      if (!options.name && scraped.siteName?.trim()) targetName = scraped.siteName.trim();
+      if (!options.brandColor) brandColor = scraped.colors.find(color => /^#[\da-f]{6}$/i.test(color)) ?? brandColor;
+      tagline ??= launchReelTagline(scraped.description);
+      if (!tagline && scraped.description) log('The website description does not supply a short tagline. Use --tagline to add one.');
     } catch (e) {
       log(`Scraping fallback: ${(e as Error).message}`);
     }
 
-    const captured = await captureWebsiteScreenshot(fullUrl, screenshotPath, log);
+    if (options.screenshot) {
+      await copyFile(resolve(options.screenshot), screenshotPath);
+      log(`Using the supplied screenshot at ${screenshotPath}`);
+    }
+    const captured = Boolean(options.screenshot) || await captureWebsiteScreenshot(fullUrl, screenshotPath, log);
     if (!captured) {
       // Use Chromium to rasterize the SVG mockup into a genuine PNG so all renderers can load it
       try {
@@ -179,15 +193,15 @@ export async function createLaunchReel(options: LaunchReelOptions): Promise<Laun
     }
   } else {
     // Local image input
-    const localFile = resolve(input);
+    const localFile = resolve(options.screenshot ?? input);
     await stat(localFile);
     await copyFile(localFile, screenshotPath);
     log(`Copied local screenshot to ${screenshotPath}`);
   }
 
-  const effectiveTagline = tagline || 'The modern standard for high-velocity teams.';
-  const cta = options.ctaText || 'Get Started Free';
-  const displayUrl = isUrl ? input.replace(/^https?:\/\//i, '').replace(/\/+$/, '') : 'motionrender.com';
+  const effectiveTagline = tagline?.trim() ?? '';
+  const displayUrl = isUrl ? input.replace(/^https?:\/\//i, '').replace(/\/+$/, '') : '';
+  const cta = options.ctaText?.trim() ?? (displayUrl ? 'Visit website' : '');
 
   // --- Voiceover Synthesis (Edge-TTS) ---
   let audioAsset: any = undefined;
@@ -196,8 +210,9 @@ export async function createLaunchReel(options: LaunchReelOptions): Promise<Laun
   if (options.voice !== false) {
     log('Synthesizing studio voiceover narration with Edge-TTS…');
     try {
-      const voice = options.voiceName || 'en-US-AvaNeural';
-      const script = `Introducing ${targetName}. ${effectiveTagline} Built from the ground up for speed, precision, and clarity. Start building today at ${displayUrl}.`;
+      const voice = options.voiceName || (typeof options.voice === 'string' ? options.voice : 'en-US-AvaNeural');
+      const script = [targetName, effectiveTagline, cta && options.ctaText ? cta : '', displayUrl ? `Visit ${displayUrl}` : '']
+        .filter(Boolean).map(line => /[.!?]$/.test(line) ? line : line + '.').join(' ');
       const speech = await synthesizeEdgeSpeech(script, { voice });
       const audioPath = join(assetsDir, 'voiceover.wav');
       await writeFile(audioPath, speech.data);
@@ -213,8 +228,8 @@ export async function createLaunchReel(options: LaunchReelOptions): Promise<Laun
   const activeStyle = detectArchetype(input, metadata, options.style);
   log(`Selected visual archetype: ${activeStyle.toUpperCase()}`);
 
-  const features = extractKeyFeatures(metadata, targetName, activeStyle);
-  log(`Extracted key features: "${features.join('", "')}"`);
+  const features = extractKeyFeatures(metadata);
+  if (features.length) log(`Selected website headings or excerpts: "${features.join('", "')}"`);
 
   const engine: LaunchReelEngine = options.engine ?? 'react';
   log(`Rendering engine: ${engine.toUpperCase()}`);

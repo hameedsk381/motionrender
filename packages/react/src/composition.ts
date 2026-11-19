@@ -194,7 +194,9 @@ function wrapperStyle(layer: Layer, frame: number, width: number, height: number
   const scale = num(valueOf(layer, 'scale', frame), 1), rotation = num(valueOf(layer, 'rotation', frame), 0), opacity = num(valueOf(layer, 'opacity', frame), 1);
   // A circle is centred on x, y: its box starts half a diameter up and to the left, and "centre" origins mean that box's middle.
   const ox = layer.type === 'circle' ? 0 : originOf(layer, 'originX', width), oy = layer.type === 'circle' ? 0 : originOf(layer, 'originY', height);
-  const style: CSSProperties = { position: 'absolute', left: 0, top: 0, opacity, transformOrigin: '0 0', transform: `translate(${x + ox}px, ${y + oy}px) rotate(${rotation}deg) scale(${scale}) translate(${-ox}px, ${-oy}px)` };
+  const sx = scale * num(valueOf(layer, 'scaleX', frame), 1);
+  const sy = scale * num(valueOf(layer, 'scaleY', frame), 1);
+  const style: CSSProperties = { position: 'absolute', left: 0, top: 0, opacity, transformOrigin: '0 0', transform: `translate(${x + ox}px, ${y + oy}px) rotate(${rotation}deg) scale(${sx}, ${sy}) translate(${-ox}px, ${-oy}px)` };
   const filters: string[] = [];
   const blur = num(valueOf(layer, 'blur', frame), 0);
   if (blur > 0) filters.push(`blur(${blur}px)`);

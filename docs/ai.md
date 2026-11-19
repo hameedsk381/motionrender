@@ -43,6 +43,9 @@ export OVE_AI_IMAGE_MODEL=gpt-image-1         # image generation; `auto` on gate
 mr ai compose demo --provider mock --brief "a test"
 ```
 
+The offline mock creates a labeled JSON placeholder without running the planner or writing React code.
+`mr plan direct` and `mr agent` require a configured text model.
+
 | Provider | chat | images | speech | word timings |
 |---|---|---|---|---|
 | `groq` (default) | yes (`openai/gpt-oss-120b`) | — | yes (Edge) | yes (`whisper-large-v3-turbo`) |
@@ -112,7 +115,7 @@ The planner chooses between a JSON composition and React code. A weak planner an
 
 ### Every video is React
 
-Whichever route made it, `mr ai compose` saves a React video: one `react` layer, plus audio layers for any sound. A scene-by-scene composition or a catalogue block is drawn by `CompositionView` (`@ove/react`), a shared component that reads the composition as data; the generated `video.tsx` holds that data and nothing a model wrote. It reuses the JSON renderer's own text layout, easing, animation and camera code, so the two agree to within anti-aliasing. A composition that uses something the view cannot draw yet (video, Lottie, shader or code layers, captions, gradient text, split rich text, colour grading, mattes and masks, path trimming) stays as JSON layers, and the compose note says which feature. Pass `--json-layers` to keep JSON layers regardless; the hosted worker renders JSON layers only.
+By default, model-written output that the React view can draw is saved as one `react` layer plus audio layers. A scene-by-scene composition or a catalogue block is drawn by `CompositionView` (`@ove/react`), a shared component that reads the composition as data; the generated `video.tsx` holds that data and nothing a model wrote. It reuses the JSON renderer's own text layout, easing, animation and camera code, so the two agree to within anti-aliasing. A composition that uses something the view cannot draw yet (video, Lottie, shader or code layers, captions, gradient text, split rich text, colour grading, mattes and masks, path trimming) stays as JSON layers, and the compose note says which feature. Pass `--json-layers` to keep JSON layers regardless; the hosted worker renders JSON layers only.
 
 ### What the video says
 
@@ -196,11 +199,10 @@ A direction the model cannot produce is not fatal — the agent says why, writes
 
 ### Brand from a URL (`--url`)
 
-`mr agent "<brief>" --url https://acme.io` reads the brand straight off the website before planning. The scraper goes deeper than the homepage markup: it mines the site's own stylesheets for custom properties, colours and `@font-face` rules (tokens the design system is literally written in, ranked by how often they are used), crawls the two highest-signal brand pages (pricing, product, about) to confirm the palette, and classifies the roles from the evidence itself — the dominant dark colour becomes the background, near-white the text, and the most-used saturated mid-tones the primary and accent. Colours seen as CSS variables outrank stray hex in markup, and every extra request is best-effort: a failed stylesheet or page shrinks the evidence, never the result. With a provider the distilled evidence is refined into a `BrandPack`; without one (or on any AI failure) the classified roles and fonts become the pack directly, so `--url` works offline with `--provider mock` too.
+`mr agent "<brief>" --url https://acme.io` reads the brand straight off the website before planning. The scraper goes deeper than the homepage markup: it mines the site's own stylesheets for custom properties, colours and `@font-face` rules (tokens the design system is literally written in, ranked by how often they are used), crawls the two highest-signal brand pages (pricing, product, about) to confirm the palette, and classifies the roles from the evidence itself — the dominant dark colour becomes the background, near-white the text, and the most-used saturated mid-tones the primary and accent. Colours seen as CSS variables outrank stray hex in markup, and every extra request is best-effort: a failed stylesheet or page shrinks the evidence, never the result. The agent refines the evidence into a `BrandPack` with the text model. If refinement fails, it uses the classified roles and fonts directly.
 
 ```sh
 mr agent "Launch reel for this product" --url https://linear.app
-mr agent "Introduce the company" --url acme.io --provider mock
 ```
 
 ## History: every AI change is kept
@@ -309,16 +311,18 @@ hand-written composition.
 mr ai narrate --brief "Explain why deterministic video rendering matters" --duration 25 \
   --composition video/composition.json
 
-# Use a script you already wrote; voices include hannah (default), austin and troy
-mr ai narrate script.txt --composition video/composition.json --voice hannah --language en
+# Speak a written script with Edge using internet access and no AI key
+mr ai narrate script.txt --composition video/composition.json --voice en-US-AvaNeural
+
+# Speak the existing content script in a composition
+mr ai narrate --composition video/composition.json
 ```
 
 The command:
 
-1. Generates a script from `--brief` (or reads your file) and strips headings, stage directions and quotation marks.
-2. Synthesises one audio file into `assets/` as a WAV file.
-3. Transcribes it to get word start/end times; writes `assets/narration.captions.json` (`{ "words": [...] }`, or
-   `{ "cues": [...] }` if only segment timings are available).
+1. Reads your script file or the composition's content script. If it needs to write a script from `--brief`, it calls the configured text model.
+2. Synthesises one audio file with Edge and writes it into `assets/`.
+3. Uses Edge's word timings to write `assets/narration.captions.json`.
 4. Adds `narration` (audio) and `narration-captions` (captions) assets and appends a scene with `startFrame: 0`
    and the video's full duration, holding the audio and a centred captions layer in the lower twelfth.
 5. Grows `durationFrames` if the voiceover is longer than the picture, plus `--tail 0.8` seconds.

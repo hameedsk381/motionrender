@@ -78,7 +78,7 @@ describe('the world scene (a cinematic 3D scene)', () => {
 
 describe('the React explainer build', () => {
   it('leaves only the kinds with a React drawing to the React build', () => {
-    expect([...REACT_KINDS].sort()).toEqual(['chart', 'closing', 'code', 'compare', 'flow', 'freeform', 'grid', 'hex', 'media', 'phone', 'pile', 'quote', 'stat', 'steps', 'timeline', 'title', 'world']);
+    expect([...REACT_KINDS].sort()).toEqual(['chart', 'closing', 'code', 'compare', 'flow', 'fold', 'freeform', 'grid', 'hex', 'media', 'phone', 'pile', 'quote', 'route', 'split', 'stat', 'steps', 'timeline', 'title', 'world']);
     const { composition, react } = compileExplainer(script(), { reactKinds: REACT_KINDS });
     expect(react?.scenes.map(item => item.scene.kind)).toEqual(['title', 'compare', 'chart', 'stat']);
     expect(react?.scenes.map(item => item.sceneId)).toEqual(['s1-title', 's2-compare', 's3-chart', 's4-stat']);

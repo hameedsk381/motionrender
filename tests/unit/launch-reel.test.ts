@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtemp, rm, writeFile, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createLaunchReel } from '@ove/ai';
+import { createLaunchReel, launchReelTagline } from '@ove/ai';
 import { buildReact } from '../../packages/cli/src/build';
 
 describe('One-Click Screenshot-to-Launch-Reel Engine', () => {
-  it('generates a valid 15-second launch reel from local screenshot with 4 synchronized beats', async () => {
+  it('uses the supplied copy in a 15-second local-image reel without invented features', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'mr-launch-reel-'));
     const dummyImage = join(tempDir, 'dashboard.png');
     // 1x1 png base64
@@ -35,29 +35,24 @@ describe('One-Click Screenshot-to-Launch-Reel Engine', () => {
       expect(comp.fps).toBe(30);
       expect(comp.durationFrames).toBe(450); // Exactly 15 seconds
 
-      // Verify 4 narrative scenes
-      expect(comp.scenes).toHaveLength(4);
-      const [s1, s2, s3, s4] = comp.scenes;
+      expect(comp.scenes).toHaveLength(3);
+      const [s1, s2, s3] = comp.scenes;
 
       // Scene 1: Hook
       expect(s1.id).toBe('scene-hook');
       expect(s1.durationFrames).toBe(105);
       expect(s1.layers.some((l: any) => l.content === 'NexusAI')).toBe(true);
+      expect(s1.layers.some((l: any) => l.content === 'Autonomous AI agents for software engineering.')).toBe(true);
 
       // Scene 2: Product Reveal
       expect(s2.id).toBe('scene-reveal');
-      expect(s2.durationFrames).toBe(135);
+      expect(s2.durationFrames).toBe(255);
       expect(s2.layers.length).toBeGreaterThan(0);
 
-      // Scene 3: Feature Callouts
-      expect(s3.id).toBe('scene-features');
-      expect(s3.durationFrames).toBe(120);
-      expect(s3.layers.length).toBeGreaterThan(0);
-
-      // Scene 4: Call to Action
-      expect(s4.id).toBe('scene-cta');
-      expect(s4.durationFrames).toBe(90);
-      expect(s4.layers.length).toBeGreaterThan(0);
+      expect(s3.id).toBe('scene-cta');
+      expect(s3.durationFrames).toBe(90);
+      expect(JSON.stringify(s3)).toContain('Start Free Trial');
+      expect(JSON.stringify(s3)).not.toContain('motionrender.com');
 
       // Verify screenshot asset was created in project assets
       const screenshotFile = join(result.projectDir, 'assets', 'screenshot.png');
@@ -66,6 +61,12 @@ describe('One-Click Screenshot-to-Launch-Reel Engine', () => {
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
+  });
+
+  it('selects a complete website sentence or leaves a long description out', () => {
+    const long = 'A ministry for students and young adults from parishes and communities across Andhra Pradesh and Telangana.';
+    expect(launchReelTagline(long)).toBe('');
+    expect(launchReelTagline(`A ministry for young adults. ${long}`)).toBe('A ministry for young adults.');
   });
 
   it('supports widescreen 16:9 and square 1:1 aspect ratios', async () => {
@@ -85,6 +86,9 @@ describe('One-Click Screenshot-to-Launch-Reel Engine', () => {
       expect(res169.composition.width).toBe(1920);
       expect(res169.composition.height).toBe(1080);
       expect(res169.engine).toBe('react');
+      const source = await readFile(res169.tsxFile!, 'utf8');
+      expect(source).toContain('const FEATURES = [];');
+      expect(source).not.toMatch(/Get Started Free|Sub-Millisecond Execution|motionrender\.com/i);
 
       // 1:1
       const res11 = await createLaunchReel({
@@ -155,6 +159,9 @@ describe('One-Click Screenshot-to-Launch-Reel Engine', () => {
       expect(result.tsxFile).toBeDefined();
       const tsxStat = await stat(result.tsxFile!);
       expect(tsxStat.isFile()).toBe(true);
+      const source = await readFile(result.tsxFile!, 'utf8');
+      expect(source).toContain('background: THEME.brandColor');
+      expect(source).toContain('Explore Now');
 
       const comp = result.composition;
       expect(comp.width).toBe(1080);

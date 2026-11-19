@@ -1,7 +1,7 @@
 // `mr explainer`: from an explainer script (what each scene is about and what is said over it) to a composition. validate checks the
 // script; the default run also records each scene's spoken line with a free Edge voice, so every scene lasts as long as its line,
 // and writes composition.json for the existing still / review / render commands.
-import { existsSync } from 'node:fs';
+import { statSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { explainerExample, explainerKindDocs, explainerLookDefs, explainerLooks, explainerSchema, type Explainer } from '@ove/schema';
@@ -22,7 +22,12 @@ export function readExplainer(raw: unknown): Explainer {
 
 /** The picture and video files a script's media scenes name that are not there, with the scene each belongs to. */
 export function missingMedia(spec: Explainer, baseDir: string): string[] {
-  return spec.scenes.flatMap((scene, i) => (scene.kind === 'media' && scene.src !== undefined && !existsSync(resolve(baseDir, scene.src)) ? [`${scene.src} (scene ${i + 1})`] : []));
+  return spec.scenes.flatMap((scene, i) => (scene.kind === 'media' && scene.src !== undefined && !hasExplainerMedia(baseDir, scene.src) ? [`${scene.src} (scene ${i + 1})`] : []));
+}
+
+export function hasExplainerMedia(baseDir: string, src: string): boolean {
+  try { return statSync(resolve(baseDir, src), { throwIfNoEntry: false })?.isFile() ?? false; }
+  catch { return false; }
 }
 
 export { wavSeconds };
@@ -136,7 +141,7 @@ export async function buildExplainer(script: Explainer, options: BuildExplainerO
   }
   const missing = missingMedia(spec, dir);
   if (missing.length) throw new Error(`The video needs files that are not next to it (${dir}):\n${missing.map(item => `- ${item}`).join('\n')}\nAdd them in the editor's Media tab or copy them there, then compile again.`);
-  const spoken = spec.scenes.filter(scene => scene.say).length, withVoice = options.voice !== false && spoken > 0, voice = options.voiceName ?? spec.voice;
+  const spoken = spec.scenes.filter(scene => scene.say).length, withVoice = !spec.silent && options.voice !== false && spoken > 0, voice = options.voiceName ?? spec.voice;
   const audio: (ExplainerAudio | undefined)[] = [];
   if (withVoice) {
     await mkdir(assets, { recursive: true });

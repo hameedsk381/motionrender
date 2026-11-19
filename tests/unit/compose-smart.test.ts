@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { composeSmart } from '../../packages/cli/src/compose-source';
 import { buildRegistry, composeSmart as composeWithSource, createProvider, type AiProvider, type ChatMessage, type Registry } from '@ove/ai';
 import { loadComposition } from '@ove/schema';
+import { runAi } from '../../packages/cli/src/ai';
+import { runPlan } from '../../packages/cli/src/plan';
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // The smart composer routes a brief: the planner's answer picks the JSON or React path (with the beats as the motion plan), and a
 // refused or failed plan falls back to writing a composition straight away.
@@ -183,9 +188,40 @@ describe('composeSmart route default', () => {
     expect(noCode.route).toBe('json');
   });
 
+  it('skips planning and React authoring when the provider is the offline mock', async () => {
+    const registry = vi.fn();
+    const react = vi.fn();
+    const result = await composeWithSource(createProvider({ provider: 'mock' }), { ...square, durationSeconds: 10 }, { registry, react });
+    expect(registry).not.toHaveBeenCalled();
+    expect(react).not.toHaveBeenCalled();
+    expect(result.route).toBe('json');
+    expect(result.composition.durationFrames).toBe(300);
+    expect(result.warnings).toEqual([expect.stringContaining('placeholder')]);
+  });
+
   it('does not invent a planner when the host has no capability list', async () => {
     const provider = scripted(composition);
     await composeWithSource(provider, { ...base, maxAttempts: 2, content: false }, {}, {});
     expect(provider.seen.some(messages => String(messages[0]!.content).includes('production planner'))).toBe(false);
   });
+});
+
+it('writes and keeps the default mock compose as a validated JSON project', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mr-mock-compose-'));
+  try {
+    const project = join(dir, 'project');
+    const args = ['ai', 'compose', project, '--provider', 'mock', '--brief', 'A short promo', '--no-research', '--duration', '10'];
+    expect(await runAi(args)).toBe(0);
+    const composition = loadComposition(JSON.parse(await readFile(join(project, 'composition.json'), 'utf8')));
+    expect(composition.durationFrames).toBe(300);
+    expect(composition.scenes.flatMap(scene => scene.layers).some(layer => layer.type === 'react')).toBe(false);
+    expect(await readdir(project)).not.toContain('video.tsx');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+it.each(['', '--react', '--constrained'])('reports the missing text model before directing a plan %s', async flag => {
+  await expect(runPlan(['plan', 'direct', 'A short promo', '--provider', 'mock', ...(flag ? [flag] : [])]))
+    .rejects.toThrow('mr plan direct requires a configured text model.');
 });
