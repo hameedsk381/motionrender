@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 try { process.loadEnvFile?.(); } catch { /* .env is optional */ }
-import { explainerJsonSchema } from '@ove/schema'; import { readFile, writeFile } from 'node:fs/promises'; import { resolve, dirname, join } from 'node:path'; import { prepareComposition, reviewComposition, measureMedia, captionTrack, formatCaptions, compositionJsonSchema, variablesSchema, resolveVariables, interpolate, describeError, outputFormats, renderMedia, renderStill, defaultConcurrency, x264Presets, defaultPreset, checkFfmpeg, describeBrowser, ffprobePath, renderDistributed, httpWorker, cacheUsage, cleanCache, ensureChromium, adaptCompositionAspect, importFigmaTokens, importFigmaFrame, fetchFigmaFile, type Composition, type OutputFormat, type X264Preset } from '@ove/core'; import { initProject } from './init'; import { checkArgs, wantsHelp, wantsVersion } from './args'; import { startDevServer } from './dev'; import { startWorker } from './worker'; import { spawnSync } from 'node:child_process'; 
+import { explainerJsonSchema } from '@ove/schema'; import { readFile, writeFile } from 'node:fs/promises'; import { resolve, dirname, join } from 'node:path'; import { prepareComposition, reviewComposition, measureMedia, captionTrack, formatCaptions, compositionJsonSchema, variablesSchema, resolveVariables, interpolate, describeError, outputFormats, renderMedia, renderStill, defaultConcurrency, x264Presets, defaultPreset, checkFfmpeg, describeBrowser, ffprobePath, renderDistributed, httpWorker, cacheUsage, cleanCache, ensureChromium, adaptCompositionAspect, importFigmaTokens, importFigmaFrame, fetchFigmaFile, type Composition, type OutputFormat, type X264Preset } from '@ove/core'; import { initProject } from './init'; import { checkArgs, commandHelp, wantsHelp, wantsVersion } from './args'; import { startDevServer } from './dev'; import { startWorker } from './worker'; import { spawnSync } from 'node:child_process';
 const launchReelUsage = `mr launch-reel <url|image.png> [--name "Name"] [--brand "#38bdf8"]
     [--style keynote|terminal|editorial|blueprint|neon|bento] [--engine react|json] [--aspect 9:16|16:9|1:1]
     [--tagline "Verified description"] [--cta "Your call to action"] [--shot screenshot.png] [--output-dir project]
@@ -32,8 +32,8 @@ Commands:
   mr facts wikipedia <topic> | country <names> <indicator> | exchange <base> <quotes> [--json]   real, sourced facts for a script (Wikipedia, World Bank, exchange rates); no key
   mr setup [dir] [--force] [--no-skills] [--local]   make a folder ready for agents (--local: the MCP config runs the installed mr, for an image or machine that has it): AGENTS.md, CLAUDE.md, MCP config for Claude Code, Codex and Cursor, and the skills
   mr dev <composition.json> [--port 3000] [--allow-host name] [variables]
-  mr validate <composition.json> [variables]
-    (code layers run JavaScript from the file: dev, still, review, render and thumbnail need --allow-code, for files you trust)
+  mr validate <composition.json> [--allow-code] [variables]
+    Validates the composition without executing code layers. Accepts --allow-code for command compatibility.
   mr inspect <composition.json> [variables]          scenes, timing and measured media
   mr captions <composition.json> [--output captions.srt|.vtt] [variables]   export the captions as a subtitle file
   mr script <composition.json> [--output script.md|script.json] [--json]   print the script, its figures and their sources
@@ -45,7 +45,7 @@ Commands:
   mr explainer kinds [--json] | looks [--json] | example [--output explainer.json]   what each scene kind shows, with a valid example (no AI needed to write a script)
   mr explainer validate|compile <explainer.json> [--output composition.json] [--no-voice] [--voice <name>]   an explainer script (scenes + spoken lines) into a video
   mr still <composition.json> [--frame 0] [--output still.png] [--transparent] [variables]
-  mr review <composition.json> [--output review.png] [--every 15] [--sheet-frames 20] [--json] [variables]   contact sheet and design checks
+  mr review <composition.json> [--output review.png] [--target social|web] [--every 15] [--sheet-frames 20] [--json] [variables]   contact sheet and design checks
   mr plan direct "brief" --react [--format 9:16] [--output explainer.json]
   mr review <composition.json> --clips-dir checkpoints [--allow-code]
   mr soundtrack video.mp4 --audio revised.wav --output revised.mp4
@@ -64,10 +64,16 @@ Render options:
   --no-motion-blur                skip the composition's motion blur, for a quicker draft
   --concurrency n --preset veryfast
   --workers URL,URL [--chunk-size 60] [--token T]   split the render across worker processes (mp4, webm, mov)
+  --allow-code                    run JavaScript layers from a trusted composition
 Variables: --var name=value (repeatable) and/or --vars values.json; --var wins.
-Options also take the form --name=value. Run "mr --help" or "ove --help" for this list.`;
+Options also take the form --name=value. Run "mr <command> --help" for command-specific usage.`;
 // Options are checked against each command's list first (args.ts), so typos fail instead of being ignored.
-if (wantsHelp(process.argv.slice(2))) { console.log(usage); process.exit(0); }
+if (wantsHelp(process.argv.slice(2))) {
+  const args = process.argv.slice(2);
+  const name = args[0] === 'help' ? args[1] : args.find(arg => arg !== '--help' && arg !== '-h');
+  console.log(name === 'ai' ? (await import('./ai')).aiUsage : commandHelp(args, usage));
+  process.exit(0);
+}
 if (wantsVersion(process.argv.slice(2))) {
   let version = '0.2.7';
   try {
@@ -262,8 +268,10 @@ Press Ctrl+C to stop.`);
         console.log(`Created ${output}`);
       }
       else if (command === 'review') { const output=resolve(option('--output') ?? 'review.png'), every=option('--every') === undefined ? undefined : Number(option('--every')), sheetOption=option('--sheet-frames') ?? option('--frames'), sheetFrames=sheetOption === undefined ? undefined : Number(sheetOption);
+        const target = option('--target');
+        if (target !== undefined && target !== 'social' && target !== 'web') throw new Error('--target must be social or web');
         if (every !== undefined && !(Number.isInteger(every) && every > 0)) throw new Error('--every must be a whole number of frames'); if (sheetFrames !== undefined && !(Number.isInteger(sheetFrames) && sheetFrames > 0 && sheetFrames <= 60)) throw new Error('--sheet-frames must be from 1 to 60');
-        const result=await reviewComposition(composition, { baseDir, allowCode: flag('--allow-code'), every, sheetFrames, showSafeZones: flag('--show-safe-zones'), onProgress: (done, total) => { if (!flag('--json') && (done === total || done % 10 === 0)) process.stderr.write(`Checked ${done}/${total} frames\r`); } }); await writeFile(output, result.sheet);
+        const result=await reviewComposition(composition, { baseDir, allowCode: flag('--allow-code'), target, every, sheetFrames, showSafeZones: flag('--show-safe-zones'), onProgress: (done, total) => { if (!flag('--json') && (done === total || done % 10 === 0)) process.stderr.write(`Checked ${done}/${total} frames\r`); } }); await writeFile(output, result.sheet);
         const clips: { scene: string; output: string }[] = [];
         const clipsDir = option('--clips-dir');
         if (clipsDir) {

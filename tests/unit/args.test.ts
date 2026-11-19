@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkArgs, wantsHelp, wantsVersion, commandSpecs } from '../../packages/cli/src/args';
+import { checkArgs, commandHelp, wantsHelp, wantsVersion, commandSpecs } from '../../packages/cli/src/args';
 describe('command-line options', () => {
   it('accepts each command\'s own options, in either form', () => { expect(checkArgs(['render', 'v.json', '--crf', '18', '--transparent', '--var', 'title=Hi'])).toEqual(['render', 'v.json', '--crf', '18', '--transparent', '--var', 'title=Hi']);
     expect(checkArgs(['render', 'v.json', '--crf=18', '--output=out/a=b.mp4'])).toEqual(['render', 'v.json', '--crf', '18', '--output', 'out/a=b.mp4']);
@@ -16,6 +16,19 @@ describe('command-line options', () => {
   it('rejects a value option without its value, and extra arguments', () => { expect(() => checkArgs(['render', 'v.json', '--output'])).toThrow('--output needs a value'); expect(() => checkArgs(['render', 'v.json', '--output', '--crf', '18'])).toThrow('--output needs a value');
     expect(() => checkArgs(['render', 'a.json', 'b.json'])).toThrow('Unexpected argument "b.json" for ove render'); });
   it('keeps --frames working for review alongside --sheet-frames', () => { expect(checkArgs(['review', 'v.json', '--frames', '12'])).toContain('--frames'); expect(checkArgs(['review', 'v.json', '--sheet-frames', '12'])).toContain('--sheet-frames'); });
+  it('accepts the code flag on validate for CLI compatibility', () => {
+    expect(checkArgs(['validate', 'v.json', '--allow-code'])).toEqual(['validate', 'v.json', '--allow-code']);
+  });
+  it('shows only the requested command, including its examples and options', () => {
+    const usage = 'Commands:\n  mr validate <file>\n  mr render <file>\n  mr render <file> --batch rows.json\n\nRender options:\n  --scale 0.5\nOptions also take the form --name=value.';
+    const render = commandHelp(['render', '--help'], usage);
+    expect(render).not.toContain('mr validate');
+    expect(render).toContain('--batch rows.json');
+    expect(render).toContain('--scale 0.5');
+    expect(render).toContain('--allow-code');
+    expect(commandHelp(['help', 'render'], usage)).toBe(render);
+    expect(commandHelp(['--help'], usage)).toBe(usage);
+  });
   it('recognises help anywhere and covers every command', () => { expect(wantsHelp(['render', '--help'])).toBe(true); expect(wantsHelp(['-h'])).toBe(true); expect(wantsHelp(['help'])).toBe(true); expect(wantsHelp(['render', 'v.json'])).toBe(false);
     expect(Object.keys(commandSpecs).sort()).toEqual(['add', 'agent', 'ai', 'blocks', 'browser', 'build', 'cache', 'captions', 'dev', 'doctor', 'explainer', 'facts', 'figma', 'init', 'inspect', 'job-worker', 'launch-reel', 'make', 'mcp', 'plan', 'production', 'render', 'review', 'schema', 'script', 'serve', 'setup', 'soundtrack', 'still', 'theme', 'thumbnail', 'track', 'validate', 'worker']); });
   it('recognises version flags and command', () => {

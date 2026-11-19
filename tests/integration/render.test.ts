@@ -14,6 +14,23 @@ beforeAll(async () => { dir=await mkdtemp(join(tmpdir(), 'ove-integration-')); r
     scenes:[{ id:'s', name:'S', startFrame:0, durationFrames:30, layers:[{ id:'tone', type:'audio', src:'tone' }, { id:'dot', type:'circle', x:80, y:45, width:40, fill:'#22c55e', animations:[{ property:'x', keyframes:[{ frame:0, value:40 }, { frame:29, value:120 }] }] }, { id:'label', type:'text', x:6, y:6, fontSize:14, content:'OVE' }] }] }); });
 afterAll(async () => { if (dir) await rm(dir, { recursive: true, force: true }); });
 describe('rendering', () => {
+  it('fades the composited scene once, including where its layers overlap', async () => {
+    const faded = loadComposition({
+      version: '1.0', id: 'fade', name: 'Fade', width: 160, height: 90, fps: 30, durationFrames: 9, background: '#000000',
+      scenes: [{ id: 'cards', name: 'Cards', durationFrames: 9, fadeIn: 2, fadeOut: 2, layers: [
+        { id: 'first', type: 'rect', width: 160, height: 90, fill: '#ffffff' },
+        { id: 'second', type: 'rect', width: 80, height: 90, fill: '#ffffff' },
+      ] }],
+    });
+    const renderer = await createRenderer(faded, { baseDir: dir, concurrency: 1 });
+    try {
+      for (const [frame, level] of [[0, 0], [1, 127], [2, 255], [7, 127], [8, 0]] as const) {
+        const { thumb } = await renderer.inspectFrame(frame);
+        expect(Math.min(...thumb.pixels)).toBeGreaterThanOrEqual(level - 1);
+        expect(Math.max(...thumb.pixels)).toBeLessThanOrEqual(level + 1);
+      }
+    } finally { await renderer.close(); }
+  });
   it.each([['mp4', ['h264','aac']], ['webm', ['vp9','opus']], ['mov', ['prores','pcm_s16le']], ['gif', ['gif']]] as const)('%s has the expected streams and length', async (format, codecs) => {
     const output=join(dir, `out.${format}`); const result=await renderMedia(composition, { baseDir: dir, output, concurrency: 2 }); expect(result).toMatchObject({ format, frames: 30 }); expect(streams(output)).toEqual(codecs); expect(duration(output)).toBeCloseTo(1, 1); });
   it('writes H.265 when asked', async () => { const output=join(dir, 'h265.mp4'); await renderMedia(composition, { baseDir: dir, output, codec: 'h265' }); expect(streams(output)[0]).toBe('hevc'); });

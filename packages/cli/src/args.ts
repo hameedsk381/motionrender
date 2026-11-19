@@ -27,7 +27,7 @@ export const commandSpecs: Record<string, Spec> = {
   serve: {},
   'job-worker': {},
   dev: { values: ['--port', '--allow-host', '--aspect', ...variables], flags: ['--allow-code'], positionals: 1 },
-  validate: { values: ['--aspect', ...variables], positionals: 1 },
+  validate: { values: ['--aspect', ...variables], flags: ['--allow-code'], positionals: 1 },
   inspect: { values: ['--aspect', ...variables], positionals: 1 },
   captions: { values: ['--output', ...variables], positionals: 1 },
   script: { values: ['--output', '--set'], flags: ['--json'], positionals: 1 },
@@ -36,7 +36,7 @@ export const commandSpecs: Record<string, Spec> = {
   make: { values: ['--output', '--sheet', '--voice', '--every'], flags: ['--draft', '--final', '--no-voice', '--react', '--no-react', '--allow-code', '--json'], positionals: 1 },
   explainer: { values: ['--output', '--voice', '--provider', '--model', '--base-url', '--scenes', '--language', '--media'], flags: ['--no-voice', '--images', '--stock', '--research', '--json'], positionals: 2 },
   still: { values: ['--frame', '--output', '--aspect', ...variables], flags: ['--transparent', '--allow-code'], positionals: 1 },
-  review: { values: ['--clips-dir', '--output', '--every', '--sheet-frames', '--frames', '--aspect', ...variables], flags: ['--json', '--allow-code', '--show-safe-zones'], positionals: 1 },
+  review: { values: ['--clips-dir', '--output', '--every', '--sheet-frames', '--frames', '--aspect', '--target', ...variables], flags: ['--json', '--allow-code', '--show-safe-zones'], positionals: 1 },
   render: { values: ['--frame-cache', '--cache-namespace', ...renderValues, ...variables], flags: ['--transparent', '--no-motion-blur', '--allow-code'], positionals: 1 },
   ai: { values: ['--public-port', '--host', '--allow-host', '--instruction', '--prompt', '--provider', '--model', '--base-url', '--brief', '--kind', '--aspect', '--duration', '--fps', '--out', '--voice', '--language', '--lang', '--size', '--composition', '--id', '--start', '--output', '--template', '--typography', '--motion-pacing', '--pacing', '--audio-mood', '--mood', '--voice-tone', '--cta', '--out-dir', '--fields', '--max-attempts', '--tail', '--asset', '--source', '--content', '--limit', '--port', '--crf', '--bitrate', '--audio-bitrate', '--scale', '--loudness', '--concurrency', '--preset', '--codec', '--format', '--max-silence', '--width', '--height', '--count', '--min', '--max'],
     flags: ['--force', '--dry-run', '--json', '--review', '--strict', '--full', '--narration', '--render', '--schema', '--no-captions', '--no-plan', '--no-react', '--transparent', '--no-motion-blur', '--sfx', '--keep-fillers', '--no-cut', '--research', '--no-research'], positionals: 3 },
@@ -45,6 +45,23 @@ export const commandSpecs: Record<string, Spec> = {
 const distance = (a: string, b: string) => { const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)] as number[]); for (let j = 1; j <= b.length; j++) d[0]![j] = j;
   for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i]![j] = Math.min(d[i-1]![j]! + 1, d[i]![j-1]! + 1, d[i-1]![j-1]! + (a[i-1] === b[j-1] ? 0 : 1)); return d[a.length]![b.length]!; };
 export const wantsHelp = (argv: string[]) => argv.includes('--help') || argv.includes('-h') || argv[0] === 'help';
+/** Reuse the global command synopsis and the validator's option list for command-specific help. */
+export function commandHelp(argv: string[], usage: string): string {
+  const name = argv[0] === 'help' ? argv[1] : argv.find(arg => arg !== '--help' && arg !== '-h');
+  if (!name || !Object.hasOwn(commandSpecs, name)) return usage;
+  const spec = commandSpecs[name]!;
+  const synopsis = [...usage.matchAll(/^  mr (\S+).*$(?:\n^    \S.*$)*/gm)]
+    .filter(match => match[1] === name).map(match => match[0]).join('\n');
+  const renderOptions = name === 'render' ? /^Render options:\n[\s\S]*?(?=\nOptions also take)/m.exec(usage)?.[0] : undefined;
+  const described = new Set(`${synopsis}\n${renderOptions ?? ''}`.match(/--[a-z-]+/g));
+  const options = [...(spec.values ?? []).filter(flag => !described.has(flag)).map(flag => `${flag} <value>`),
+    ...(spec.flags ?? []).filter(flag => !described.has(flag))];
+  return [
+    `Usage:\n${synopsis || `  mr ${name}`}`,
+    renderOptions,
+    options.length ? `Other options:\n  ${options.join('\n  ')}` : undefined,
+  ].filter(Boolean).join('\n\n');
+}
 export const wantsVersion = (argv: string[]) => argv.includes('--version') || argv.includes('-v') || argv[0] === 'version';
 // Splits --name=value, then checks the command's options. Returns the argument list the rest of the CLI reads.
 export function checkArgs(argv: string[]): string[] { const args = argv.flatMap(arg => /^--[a-z-]+=/.test(arg) ? [arg.slice(0, arg.indexOf('=')), arg.slice(arg.indexOf('=') + 1)] : [arg]);

@@ -71,6 +71,14 @@ describe('Wikipedia and exchange lookups', () => {
     expect(facts.map(fact => fact.text)).toEqual(['1 USD = 93.92 INR on 2026-11-06', '1 USD = 0.89566 EUR on 2026-11-06']);
     expect(facts[0]!.source).toMatch(/European Central Bank/);
   });
+
+  it('returns supported quotes and reports each omitted currency once', async () => {
+    const { facts, notes } = await gatherFacts([
+      { type: 'exchange', base: 'usd', quotes: ['INR', 'pkr', 'EUR', 'PKR'] },
+    ], { fetch: bank([]).fetch });
+    expect(facts).toHaveLength(2);
+    expect(notes).toEqual(['No ECB reference rate for USD → PKR was returned by Frankfurter.']);
+  });
 });
 
 describe('a lookup that fails', () => {

@@ -20,6 +20,7 @@ import {
   Loop,
   NumberTicker,
   ProgressBar,
+  Scene,
   Sequence,
   Series,
   Still,
@@ -38,8 +39,26 @@ import {
 // The components are pure functions of the frame: render them as the bundle's render function does, at a chosen frame.
 const shared = (globalThis as any).__oveReact as { frame: any; config: any };
 const config = { id: 't', width: 640, height: 360, fps: 30, durationInFrames: 90 };
-const at = (frame: number, node: ReactNode) => renderToStaticMarkup(createElement(shared.config.Provider, { value: config }, createElement(shared.frame.Provider, { value: frame }, node)));
+const at = (frame: number, node: ReactNode, canvas = config) => renderToStaticMarkup(createElement(shared.config.Provider, { value: canvas }, createElement(shared.frame.Provider, { value: frame }, node)));
+it('scales badges for a portrait canvas and preserves explicit font-size overrides', () => {
+  const portrait = { ...config, width: 1080, height: 1920 };
+  expect(at(20, createElement(Badge, null, 'Portrait'), portrait)).toContain('font-size:28px');
+  expect(at(20, createElement(Badge, { style: { fontSize: 36 } }, 'Override'), portrait)).toContain('font-size:36px');
+  expect(at(20, createElement(Badge, null, 'Small'))).toContain('font-size:14px');
+});
 const Probe = () => createElement('span', null, `frame ${useCurrentFrame()} of ${useVideoConfig().durationInFrames} at ${useVideoConfig().fps}`);
+
+it('fades a scene as a unit on its local frame grid', () => {
+  const scene = createElement(Scene, { from: 10, durationInFrames: 9, opacity: 0.8, fadeIn: 2, fadeOut: 2 }, createElement(Probe));
+  expect(at(9, scene)).toBe('');
+  expect(at(10, scene)).toContain('opacity:0');
+  expect(at(11, scene)).toContain('opacity:0.4');
+  expect(at(12, scene)).toContain('opacity:0.8');
+  expect(at(17, scene)).toContain('opacity:0.4');
+  expect(at(18, scene)).toContain('opacity:0');
+  expect(at(19, scene)).toBe('');
+  expect(at(11, scene)).toContain('frame 1 of 90');
+});
 
 describe('@ove/react', () => {
   it('gives components the frame and the video config, and refuses to run outside a render', () => {

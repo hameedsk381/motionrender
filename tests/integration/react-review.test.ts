@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
 import { buildReact } from '../../packages/cli/src/build';
-import { createRenderer, loadComposition } from '@ove/core';
+import { createRenderer, loadComposition, reviewComposition } from '@ove/core';
 
 it('inspects visible and clipped React text even after a cached render', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'mr-react-review-'));
@@ -24,5 +24,27 @@ export default function Video(){return <div style={{width:640,height:360,backgro
       expect(first.texts.find(text => text.text === 'Covered text')?.occluded).toBe(true);
       expect(second.texts).toEqual(first.texts);
     } finally { await renderer.close(); }
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+it('reviews landscape web labels at a smaller scale and still catches tiny text', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mr-review-target-'));
+  try {
+    const source = join(dir, 'video.tsx'), output = join(dir, 'composition.json');
+    await writeFile(source, `export const config = {width:1920,height:1080,fps:30,durationInFrames:60};
+export default function Video() {
+  return <div style={{position:'absolute',inset:0,background:'#fff',color:'#000',padding:80}}>
+    <p style={{fontSize:16}}>Project label</p><p style={{fontSize:10}}>Tiny label</p>
+  </div>;
+}`);
+    await buildReact(source, output);
+    const composition = loadComposition(JSON.parse(await readFile(output, 'utf8')));
+    const options = { baseDir: dir, allowCode: true, audio: false, every: 15, sheetFrames: 2, concurrency: 1 };
+    const social = await reviewComposition(composition, options);
+    const web = await reviewComposition(composition, { ...options, target: 'web' });
+    const smallText = (report: typeof web) => report.issues.filter(issue => issue.code === 'small-text').map(issue => issue.message);
+    expect(smallText(social).join('\n')).toContain('Project label');
+    expect(smallText(web)).toHaveLength(1);
+    expect(smallText(web)[0]).toContain('Tiny label');
   } finally { await rm(dir, { recursive: true, force: true }); }
 });

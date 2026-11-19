@@ -91,7 +91,7 @@ function drawOp(op){try{drawLayer(op)}catch(e){if(e&&e.oveLayer)throw e;const er
 const shadowCanvases=[];let shadowDepth=0;
 function shadowCanvas(w,h){let m=shadowCanvases[shadowDepth];if(!m){m=document.createElement('canvas');shadowCanvases[shadowDepth]=m}if(m.width!==w)m.width=w;if(m.height!==h)m.height=h;return m}
 function drawLayer(op){const l=op.layer,e=l.evaluated||{},x=e.x??l.x,y=e.y??l.y,opacity=e.opacity??l.opacity,scale=e.scale??l.scale,sx=e.scaleX??l.scaleX??1,sy=e.scaleY??l.scaleY??1,rotation=e.rotation??l.rotation;const ox=l.originX||0,oy=l.originY||0,alpha=ctx.globalAlpha*opacity;
-  if(l.shadow&&alpha<0.999){const main=ctx,t=main.getTransform(),w=c.width,h=c.height,S=shadowCanvas(w,h),s=S.getContext('2d');
+  if((l.shadow&&alpha<0.999)||(l.isolateOpacity&&opacity<1)){const main=ctx,t=main.getTransform(),w=c.width,h=c.height,S=shadowCanvas(w,h),s=S.getContext('2d');
     s.setTransform(1,0,0,1,0,0);s.clearRect(0,0,w,h);s.globalAlpha=1;s.globalCompositeOperation='source-over';s.filter='none';s.shadowColor='transparent';s.setTransform(t);
     ctx=s;const prior=noteAlpha;shadowDepth++;noteAlpha=prior*alpha;try{drawPlaced(op,x,y,ox,oy,scale,rotation,true,sx,sy)}finally{noteAlpha=prior;ctx=main;shadowDepth--}
     main.save();main.globalAlpha*=opacity;main.shadowColor='transparent';if(l.blendMode&&l.blendMode!=='normal')main.globalCompositeOperation=l.blendMode;main.setTransform(1,0,0,1,0,0);main.drawImage(S,0,0);main.restore();return}

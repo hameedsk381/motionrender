@@ -96,7 +96,7 @@ export function interpolate(x: number, input: number[], output: number[], option
 // ---- video
 export type VideoOptions = { id: string; name?: string; width: number; height: number; fps?: number; background?: unknown; motionBlur?: { samples?: number; shutter?: number } | boolean;
   /** Seconds of the whole video; leave out to follow the scenes. */ durationSeconds?: number; tempo?: { bpm: number; offset?: number; beatsPerBar?: number } };
-export type SceneOptions = { name?: string; /** Frames, or use `seconds`. */ duration?: number; seconds?: number; startFrame?: number; transitionIn?: Transition; transitionOut?: Transition; overlap?: number;
+export type SceneOptions = { name?: string; /** Frames, or use `seconds`. */ duration?: number; seconds?: number; startFrame?: number; transitionIn?: Transition; transitionOut?: Transition; overlap?: number; opacity?: number; fadeIn?: number; fadeOut?: number;
   camera?: { x?: number; y?: number; zoom?: number; rotation?: number; shake?: number; animations?: Animation[] }; background?: unknown; [other: string]: unknown };
 export type SceneBuilder = { readonly layers: Layer[]; add(...layers: (Layer | Layer[])[]): SceneBuilder };
 export type VideoBuilder = {

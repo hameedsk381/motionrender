@@ -70,7 +70,7 @@ function createPlaceholderMockup(title: string, color: string, width = 1280, hei
       </linearGradient>
       <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
         <stop offset="0%" stop-color="${color}"/>
-        <stop offset="100%" stop-color="#818cf8"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0.55"/>
       </linearGradient>
     </defs>
     <rect width="${width}" height="${height}" rx="24" fill="url(#bg)"/>

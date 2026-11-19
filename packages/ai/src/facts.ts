@@ -143,24 +143,30 @@ async function countryFigures(names: string[], indicator: FactIndicator, options
   }));
 }
 
-async function exchange(base: string, quotes: string[], options: FactsOptions): Promise<Fact[]> {
-  const reply = await getJson(`https://api.frankfurter.dev/v1/latest?base=${base.toUpperCase()}&symbols=${quotes.map(quote => quote.toUpperCase()).join(',')}`, options) as { base: string; date: string; rates: Record<string, number> };
-  return Object.entries(reply.rates ?? {}).map(([quote, rate]) => ({ text: `1 ${reply.base} = ${rate} ${quote} on ${reply.date}`, source: 'European Central Bank, via Frankfurter', url: 'https://frankfurter.dev', date: reply.date }));
+async function exchange(base: string, quotes: string[], options: FactsOptions): Promise<{ facts: Fact[]; notes: string[] }> {
+  const requested = new Set(quotes.map(quote => quote.toUpperCase()));
+  const reply = await getJson(`https://api.frankfurter.dev/v1/latest?base=${base.toUpperCase()}&symbols=${[...requested].join(',')}`, options) as { base: string; date: string; rates: Record<string, number> };
+  const facts = Object.entries(reply.rates ?? {}).flatMap(([quote, rate]) =>
+    Number.isFinite(rate) && requested.delete(quote)
+      ? [{ text: `1 ${reply.base} = ${rate} ${quote} on ${reply.date}`, source: 'European Central Bank, via Frankfurter', url: 'https://frankfurter.dev', date: reply.date }]
+      : []);
+  const notes = [...requested].map(quote => `No ECB reference rate for ${base.toUpperCase()} → ${quote} was returned by Frankfurter.`);
+  return { facts, notes };
 }
 
 /** Runs every lookup; the facts that came back, and a plain note for each lookup that did not. */
 export async function gatherFacts(lookups: Lookup[], options: FactsOptions = {}): Promise<{ facts: Fact[]; notes: string[] }> {
   const results = await Promise.all(lookups.map(async lookup => {
     try {
+      if (lookup.type === 'exchange') return await exchange(lookup.base, lookup.quotes, options);
       const facts = lookup.type === 'wikipedia' ? await wikipedia(lookup.topic, options)
-        : lookup.type === 'country' ? await countryFigures(lookup.countries, lookup.indicator, options)
-        : await exchange(lookup.base, lookup.quotes, options);
-      return { facts, note: facts.length ? undefined : `No figures came back for ${JSON.stringify(lookup)}` };
+        : await countryFigures(lookup.countries, lookup.indicator, options);
+      return { facts, notes: facts.length ? [] : [`No figures came back for ${JSON.stringify(lookup)}`] };
     } catch (error) {
-      return { facts: [] as Fact[], note: `Could not look up ${lookup.type} (${(error as Error).message})` };
+      return { facts: [] as Fact[], notes: [`Could not look up ${lookup.type} (${(error as Error).message})`] };
     }
   }));
-  return { facts: results.flatMap(result => result.facts), notes: results.flatMap(result => (result.note ? [result.note] : [])) };
+  return { facts: results.flatMap(result => result.facts), notes: results.flatMap(result => result.notes) };
 }
 
 /** Asks the model which lookups would help with a brief. It names topics only; everything that is fetched comes from the fixed list above. */

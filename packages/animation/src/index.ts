@@ -1,4 +1,13 @@
 import type { Animation } from '@ove/schema';
+
+export type SceneFades = { opacity?: number; fadeIn?: number; fadeOut?: number };
+
+/** Linear visual fades, measured from the first and last rendered frames of a scene. */
+export function sceneOpacity(frame: number, duration: number, { opacity = 1, fadeIn = 0, fadeOut = 0 }: SceneFades): number {
+  const entry = fadeIn > 0 ? Math.min(1, Math.max(0, frame / fadeIn)) : 1;
+  const exit = fadeOut > 0 ? Math.min(1, Math.max(0, (duration - 1 - frame) / fadeOut)) : 1;
+  return opacity * entry * exit;
+}
 export const easingNames = ['linear','easeIn','easeOut','easeInOut','easeInCubic','easeOutCubic','easeInOutCubic','easeInQuart','easeOutQuart','easeInOutQuart','easeInExpo','easeOutExpo','easeInOutExpo','easeInBack','easeOutBack','spring','hold','land','snap','glide','pop','move','exit','drift','anticipate','bounce'] as const;
 // A named curve, or [x1, y1, x2, y2] control points of a CSS-style cubic Bézier from (0,0) to (1,1).
 export type Easing = typeof easingNames[number] | readonly [number, number, number, number];

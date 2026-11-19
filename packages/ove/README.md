@@ -42,9 +42,13 @@ const png = await renderStill(composition, { baseDir, frame: 45 }); // a Buffer
 ## React Videos & Builder
 
 ```js
-import { AbsoluteFill, Series, interpolate, spring, useCurrentFrame, useVideoConfig } from 'motionrender/react';
+import { AbsoluteFill, Scene, Series, interpolate, spring, useCurrentFrame, useVideoConfig } from 'motionrender/react';
 import { createVideo, text, rect, sample } from 'motionrender/builder';
 ```
+
+`<Scene from={24} durationInFrames={32} fadeIn={6} fadeOut={6}>` fades its React visuals. Audio cues in adjacent sequences can reuse the same source. Give cues distinct `name` values if they reuse the same JSX position and sequence start.
+
+`mr review composition.json --target web` uses web type sizing and omits social feed UI bands. The default target is `social`.
 
 ## Player (browser)
 

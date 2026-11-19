@@ -7,7 +7,7 @@
 // shipping a video that silently lost them. Conventions follow the canvas runtime: a layer's x, y is its top-left corner (a circle's
 // centre), rotation and scale pivot on (x + originX, y + originY), and text is aligned about x.
 import { createElement, type CSSProperties, type ReactElement, type ReactNode } from 'react';
-import { evaluateAnimation, ease, type Easing } from '@ove/animation';
+import { evaluateAnimation, ease, sceneOpacity, type Easing } from '@ove/animation';
 import { cameraState, splitUnits } from '@ove/timeline';
 import { useCurrentFrame, useVideoConfig } from './index';
 
@@ -351,7 +351,10 @@ export function CompositionView({ composition, assets = {} }: { composition: Com
       children.push(createElement('div', { key: 'camera', style: { position: 'absolute', left: 0, top: 0, width, height, transformOrigin: '0 0', transform: `translate(${width / 2 - cam.x + cam.x}px, ${height / 2 - cam.y + cam.y}px) rotate(${-cam.rotation}deg) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)` } }, draw(ordered.filter((layer: Layer) => !layer.fixed))), ...draw(ordered.filter((layer: Layer) => layer.fixed)));
     } else children.push(...draw(ordered));
     if (t && t.type === 'dip') children.push(createElement('div', { key: 'dip', style: { position: 'absolute', inset: 0, background: t.color ?? '#000000', opacity: 1 - t.progress } }));
-    return createElement('div', { key: scene.id ?? index, style: sceneStyle(t && t.type === 'dip' ? { ...t, progress: 1 } : t, width, height) }, children);
+    const style = sceneStyle(t && t.type === 'dip' ? { ...t, progress: 1 } : t, width, height);
+    const opacity = sceneOpacity(local, scene.durationFrames, scene);
+    if (opacity !== 1) style.opacity = opacity * Number(style.opacity ?? 1);
+    return createElement('div', { key: scene.id ?? index, style }, children);
   });
   return createElement('div', { style: { position: 'absolute', left: 0, top: 0, width, height, overflow: 'hidden' } }, scenes);   // no background here: the renderer paints it (and the texture and grain over it) under every layer
 }

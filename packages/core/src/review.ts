@@ -8,7 +8,8 @@ export type ReviewIssue = { severity: 'error' | 'warning' | 'info'; code: string
 export type ReviewResult = { checkpoints?: (Storyboard & { scene: string; frame: number; motionFrames: number[] })[]; scope?: 'composition-technical'; creativeQuality?: 'unassessed'; issues: ReviewIssue[]; sheet: Buffer; sheetFrames: number[]; sampledFrames: number; loudness?: { integrated: number; truePeak: number } };
 export type ReviewRepairTask = { id: string; severity: ReviewIssue['severity']; target: { sceneId?: string; beatId?: string; layer?: string; frame?: number }; category: 'layout' | 'copy' | 'motion' | 'audio' | 'continuity' | 'style'; instruction: string; issues: ReviewIssue[] };
 export type SafeZone = { top?: number; bottom?: number; left?: number; right?: number };
-export type ReviewOptions = { allowCode?: boolean; baseDir?: string; every?: number; sheetFrames?: number; columns?: number; concurrency?: number; audio?: boolean; safeZone?: SafeZone; showSafeZones?: boolean; onProgress?: (done: number, total: number) => void };
+export type ReviewTarget = 'social' | 'web';
+export type ReviewOptions = { allowCode?: boolean; baseDir?: string; every?: number; sheetFrames?: number; columns?: number; concurrency?: number; audio?: boolean; target?: ReviewTarget; safeZone?: SafeZone; showSafeZones?: boolean; onProgress?: (done: number, total: number) => void };
 
 const area = (a: TextNote) => Math.max(0, a.x1 - a.x0) * Math.max(0, a.y1 - a.y0);
 type Rect = { x0: number; y0: number; x1: number; y1: number };
@@ -88,7 +89,8 @@ export async function reviewComposition(composition: Composition, options: Revie
   }
   frames.sort((a, b) => a - b);
   sheetFrames.sort((a, b) => a - b);
-  const bands=safeZoneBands(width, height, options.safeZone);
+  const web = options.target === 'web';
+  const bands=safeZoneBands(width, height, web ? { top: 0, bottom: 0, left: 0, right: 0, ...options.safeZone } : options.safeZone);
   const safeBands = options.showSafeZones ? bands.map(b => ({ x0: b.x0 / width, y0: b.y0 / height, x1: b.x1 / width, y1: b.y1 / height })) : undefined;
   const renderer=await createRenderer(composition, { baseDir, concurrency: options.concurrency ?? defaultConcurrency(), scale: Math.min(1, 1280/Math.max(width, height)), allowCode: options.allowCode });
   let reports: FrameReport[]=[], sheet: Buffer; try { let done=0; reports=await Promise.all(frames.map(f => renderer.inspectFrame(f).then(r => { options.onProgress?.(++done, frames.length); return r; })));
@@ -102,12 +104,14 @@ export async function reviewComposition(composition: Composition, options: Revie
       for (const key of runs.keys()) if (!seen.has(key)) runs.delete(key); }); };
   // A second of samples: long enough to skip entrances (scale-ins, slides from off-frame) and transitions, where layers pass through
   // tiny sizes and over each other on purpose.
-  const hold=Math.max(2, Math.ceil(fps/every)+1), margin=0.01*minSide, smallest=minSide*0.018;
+  const hold=Math.max(2, Math.ceil(fps/every)+1), margin=0.01*minSide;
+  const smallest = minSide * (web ? 0.012 : 0.018);
+  const bodySize = minSide * (web ? 0.016 : 0.024);
   persistent('text-cut', 1, t => t.truncated ? `"${t.text}" is cut short with "…": give it more room (maxWidth/maxLines) or a minFontSize` : undefined, 'error');
   persistent('dom-clip', hold, t => visible(t) && t.clipped ? `"${t.text}" is clipped by a React text container` : undefined, 'error');
   persistent('contrast', hold, t => visible(t) && t.contrast !== undefined && t.contrast < (t.size >= minSide * .024 ? 3 : 4.5) ? `"${t.text}" has ${t.contrast.toFixed(2)}:1 contrast against its solid DOM background` : undefined, 'warning');
   persistent('off-frame', hold, t => visible(t) && (t.x0 < -margin || t.y0 < -margin || t.x1 > width+margin || t.y1 > height+margin) ? `"${t.text}" runs off the frame` : undefined, 'error');
-  persistent('small-text', hold, t => visible(t) && t.size < smallest ? `"${t.text}" is ${Math.round(t.size)} px, too small to read on a phone (labels ${Math.ceil(smallest)}+ px, body ${Math.round(minSide*0.024)}+ px)` : undefined, 'warning');
+  persistent('small-text', hold, t => visible(t) && t.size < smallest ? `"${t.text}" is ${Math.round(t.size)} px, too small for ${web ? 'web playback' : 'phone viewing'} (labels ${Math.ceil(smallest)}+ px, body ${Math.round(bodySize)}+ px)` : undefined, 'warning');
   persistent('overlap', hold, (t, report) => { if (!visible(t)) return; const other=report.texts.find(o => o !== t && o.id !== t.id && visible(o) && overlap(t, o) > 0.15*Math.min(area(t), area(o)) && (t.kind === 'captions' || o.kind === 'captions' || t.id < o.id));
     return other ? (t.kind === 'captions' || other.kind === 'captions' ? `"${(t.kind === 'captions' ? other : t).text}" sits under the captions: keep content out of the captions band` : `"${t.text}" overlaps "${other.text}"`) : undefined; }, 'error');
   // Platform UI bands: on a vertical canvas the app's own chrome covers the bottom and right of the frame, so text there is

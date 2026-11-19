@@ -2,8 +2,9 @@
 // size and length, and what it renders is drawn for that frame. `ove build video.tsx` bundles the component into a `react` layer, which
 // the renderer mounts it live in a page every frame (real effects, canvas and WebGL work) and draws the result as markup, so the output
 // stays frame-exact and goes through the same encoder, audio and review as any other composition. Derive everything from the frame.
-import { Children, createContext, createElement, isValidElement, useContext, type Context, type CSSProperties, type HTMLAttributes, type ImgHTMLAttributes, type ReactElement, type ReactNode } from 'react';
+import { Children, createContext, createElement, isValidElement, useContext, useId, type Context, type CSSProperties, type HTMLAttributes, type ImgHTMLAttributes, type ReactElement, type ReactNode } from 'react';
 import { interpolate, spring as builderSpring } from '@ove/builder';
+import { sceneOpacity, type SceneFades } from '@ove/animation';
 
 export { interpolate };
 
@@ -40,7 +41,8 @@ export * from './components';
 export type VideoConfig = { id?: string; width: number; height: number; fps: number; durationInFrames: number };
 
 // The contexts live on globalThis so the bundle's render function and your components share them whichever copy of this file each imported.
-const shared = ((globalThis as any).__oveReact ??= { frame: createContext<number | null>(null), config: createContext<VideoConfig | null>(null) }) as { frame: Context<number | null>; config: Context<VideoConfig | null> };
+const shared = ((globalThis as any).__oveReact ??= { frame: createContext<number | null>(null), config: createContext<VideoConfig | null>(null) }) as { frame: Context<number | null>; config: Context<VideoConfig | null>; mediaStart?: Context<number> };
+const mediaStart = (shared.mediaStart ??= createContext(0));
 
 /** The frame being drawn, counted from 0 (inside a Sequence: from the start of the sequence). */
 export function useCurrentFrame(): number {
@@ -66,11 +68,15 @@ export function continueRender(handle: number): void { ((globalThis as any).__ov
 
 // Audio and Video are found when you run ove build, which renders the component once per frame and turns each run of frames where one is
 // shown into an audio or video layer (so the mixer and the decoder do their usual frame-exact work). They draw nothing themselves.
-type MediaProps = { src: string; /** Frames of the source to skip. */ startFrom?: number; volume?: number; playbackRate?: number; loop?: boolean; /** Tells apart two clips with the same src shown together. */ name?: string };
+type MediaProps = { src: string; /** Frames of the source to skip. */ startFrom?: number; volume?: number; playbackRate?: number; loop?: boolean; /** Stable identity for this cue. Use distinct names for same-source cues that share a render slot. */ name?: string };
 const mediaMarker = (kind: 'audio' | 'video', props: MediaProps & Record<string, unknown>, extra: Record<string, unknown> = {}): ReactElement => createElement('i', {
   hidden: true, 'data-ove-media': kind, 'data-src': props.src, 'data-trim': props.startFrom ?? 0, 'data-volume': props.volume ?? 1, 'data-rate': props.playbackRate ?? 1, 'data-loop': props.loop ? 1 : 0, 'data-name': props.name ?? '', ...extra });
 /** Plays a sound (an audio asset id, a file, or sfx:name) for as long as it is shown, counted from when it appears. */
-export function Audio(props: MediaProps): ReactElement { return mediaMarker('audio', props); }
+export function Audio(props: MediaProps): ReactElement {
+  const instance = useId();
+  const start = useContext(mediaStart);
+  return mediaMarker('audio', props, { 'data-instance': instance, 'data-start': start });
+}
 /** Plays a video clip under the component (or over it with layer="front"). left, top, width and height place it, and may change with the frame (the clip then moves or resizes); the default fills the video. */
 export function Video(props: MediaProps & { /** Corner radius in pixels. */ radius?: number; muted?: boolean; left?: number; top?: number; width?: number; height?: number; objectFit?: 'cover' | 'contain' | 'fill'; /** 'back' (default) draws the clip under the component, 'front' over it. */ layer?: 'back' | 'front' }): ReactElement {
   return mediaMarker('video', props, { 'data-radius': props.radius ?? 0, 'data-left': props.left ?? 0, 'data-top': props.top ?? 0, 'data-width': props.width ?? 0, 'data-height': props.height ?? 0, 'data-fit': props.objectFit ?? 'cover', 'data-layer': props.layer ?? 'back', 'data-muted': props.muted ? 1 : 0 });
@@ -116,28 +122,38 @@ export function AbsoluteFill({ style, from, durationInFrames, children, ...rest 
 }
 
 /** Shows its children from frame `from` for `durationInFrames`, with the frame counted from the start of the sequence. */
-export function Sequence({ from = 0, durationInFrames = Infinity, layout = 'absolute-fill', children }: { from?: number; durationInFrames?: number; layout?: 'absolute-fill' | 'none'; name?: string; children?: ReactNode }): ReactElement | null {
+type SequenceProps = SceneFades & { from?: number; durationInFrames?: number; layout?: 'absolute-fill' | 'none'; name?: string; children?: ReactNode };
+export function Sequence({ from = 0, durationInFrames = Infinity, layout = 'absolute-fill', children, opacity, fadeIn, fadeOut }: SequenceProps): ReactElement | null {
   const frame = useCurrentFrame();
+  const start = useContext(mediaStart);
   if (frame < from || frame >= from + durationInFrames) return null;
-  const inner = createElement(shared.frame.Provider, { value: frame - from }, children);
-  return layout === 'none' ? inner : createElement(AbsoluteFill, null, inner);
+  const local = frame - from;
+  const inner = createElement(mediaStart.Provider, { value: start + from },
+    createElement(shared.frame.Provider, { value: local }, children));
+  if (opacity === undefined && !fadeIn && !fadeOut) return layout === 'none' ? inner : createElement(AbsoluteFill, null, inner);
+  const style = { opacity: sceneOpacity(local, durationInFrames, { opacity, fadeIn, fadeOut }) };
+  return layout === 'none' ? createElement('div', { style }, inner) : createElement(AbsoluteFill, { style }, inner);
 }
 
+/** A timed visual scene. Accepts the same props as Sequence, including fades in frames. */
+export const Scene = Sequence;
+
+type SeriesSequenceProps = SceneFades & { durationInFrames: number; offset?: number; children?: ReactNode };
 /** Plays its Series.Sequence children one after another. */
 export function Series({ children }: { children?: ReactNode }): ReactElement {
   let start = 0;
   const parts = Children.toArray(children).map((child, i) => {
     if (!isValidElement(child)) return child;
-    const { durationInFrames, offset = 0, children: inner } = child.props as { durationInFrames: number; offset?: number; children?: ReactNode };
+    const { durationInFrames, offset = 0, children: inner, opacity, fadeIn, fadeOut } = child.props as SeriesSequenceProps;
     if (!(durationInFrames > 0)) throw new Error('Every Series.Sequence needs a durationInFrames');
     start += offset;
-    const element = createElement(Sequence, { key: i, from: start, durationInFrames }, inner);
+    const element = createElement(Sequence, { key: i, from: start, durationInFrames, opacity, fadeIn, fadeOut }, inner);
     start += durationInFrames;
     return element;
   });
   return createElement('div', { style: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } }, ...parts);
 }
-Series.Sequence = function SeriesSequence(_props: { durationInFrames: number; offset?: number; children?: ReactNode }): ReactElement | null { return null; };
+Series.Sequence = function SeriesSequence(_props: SeriesSequenceProps): ReactElement | null { return null; };
 
 /** Easing functions for interpolate: `interpolate(frame, [0, 30], [0, 1], { easing: Easing.out(Easing.cubic) })`. */
 export const Easing = {
@@ -164,9 +180,11 @@ export const staticFile = (src: string): string => src.replace(/^\/+/, '');
 /** Loops its children every `durationInFrames` frames. */
 export function Loop({ durationInFrames, times = Infinity, children }: { durationInFrames: number; times?: number; children?: ReactNode }): ReactElement | null {
   const frame = useCurrentFrame();
+  const start = useContext(mediaStart);
   if (frame >= durationInFrames * times) return null;
   const looped = frame % durationInFrames;
-  return createElement(shared.frame.Provider, { value: looped }, children);
+  return createElement(mediaStart.Provider, { value: start + frame - looped },
+    createElement(shared.frame.Provider, { value: looped }, children));
 }
 
 /** Freezes the frame value for its children at a specific frame number. */

@@ -235,7 +235,8 @@ export function Badge({
   style,
 }: BadgeProps): ReactElement {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width, height } = useVideoConfig();
+  const fontSize = Math.max(14, Math.round(Math.min(width, height) * 0.026));
 
   const progress = springValue({ frame, fps, delay, preset: 'bouncy', from: 0, to: 1 });
   const scale = 0.8 + progress * 0.2;
@@ -245,13 +246,13 @@ export function Badge({
     style: {
       display: 'inline-flex',
       alignItems: 'center',
-      gap: 8,
-      padding: '6px 14px',
+      gap: '0.57em',
+      padding: '0.43em 1em',
       borderRadius: 9999,
       background: 'rgba(255, 255, 255, 0.08)',
       border: '1px solid rgba(255, 255, 255, 0.16)',
       color: '#f9fafb',
-      fontSize: 14,
+      fontSize,
       fontWeight: 500,
       letterSpacing: '0.02em',
       opacity,
@@ -262,8 +263,9 @@ export function Badge({
   },
     dot ? createElement('span', {
       style: {
-        width: 8,
-        height: 8,
+        width: '0.57em',
+        height: '0.57em',
+        flexShrink: 0,
         borderRadius: '50%',
         background: dotColor,
         boxShadow: `0 0 10px ${dotColor}`,

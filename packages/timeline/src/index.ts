@@ -1,8 +1,8 @@
-import type { Composition, Layer } from '@ove/schema'; import { evaluateAnimation, animationSegment, ease } from '@ove/animation';
+import type { Composition, Layer } from '@ove/schema'; import { evaluateAnimation, animationSegment, ease, sceneOpacity } from '@ove/animation';
 // units: for split text, the animated values of each stagger step (step 0 starts first); the drawing runtime maps pieces to steps.
 export type UnitValues = { x?: number; y?: number; opacity?: number; scale?: number; rotation?: number; blur?: number; color?: string };
 // morph: for a path whose d animates, the two shapes around this frame and the eased progress between them (drawn by the runtime).
-export type EvaluatedLayer = Layer & { evaluated: Record<string, number | string>; localFrame: number; children?: EvaluatedLayer[]; units?: UnitValues[]; morph?: { from: string; to: string; t: number } };
+export type EvaluatedLayer = Layer & { evaluated: Record<string, number | string>; localFrame: number; children?: EvaluatedLayer[]; isolateOpacity?: boolean; units?: UnitValues[]; morph?: { from: string; to: string; t: number } };
 type SplitAnimation = { property: string; keyframes: { frame: number; value: number | string; easing?: any }[] };
 // Preset animations for split text, with distances in ems so they suit any font size.
 export function splitPresetAnimations(preset: string, duration: number, fontSize: number): SplitAnimation[] { const d=duration, fade=Math.max(1, Math.round(d*0.6)), em=fontSize;
@@ -61,9 +61,15 @@ export function evaluateFrame(composition: Composition, frame: number): Evaluate
       layers=[{ id: `camera:${scene.id}`, type: 'group', startFrame: 0, x: width/2-cam.x, y: height/2-cam.y, originX: cam.x, originY: cam.y, scale: cam.zoom, rotation: -cam.rotation, opacity: 1, zIndex: 0, visible: true, fixed: false, animations: [], children: moving, evaluated: {}, localFrame } as unknown as EvaluatedLayer, ...fixed]; }
     const effects=[scene.transitionIn && { transition: scene.transitionIn, progress: Math.min(1, localFrame/scene.transitionIn.durationFrames) }, scene.transitionOut && { transition: scene.transitionOut, progress: Math.min(1, (scene.durationFrames-localFrame)/scene.transitionOut.durationFrames) }].filter((e): e is { transition: Transition; progress: number } => !!e && e.progress < 1);
     const pushed=pushes.filter(p => p.index > index).reduce((o, p) => ({ dx: o.dx+p.dx, dy: o.dy+p.dy }), { dx: 0, dy: 0 });
-    if (!effects.length && !pushed.dx && !pushed.dy) return layers; const state=transitionState(effects, width, height); state.x+=pushed.dx; state.y+=pushed.dy;
+    const opacity = sceneOpacity(localFrame, scene.durationFrames, scene);
+    if (opacity === 0) return [];
+    if (opacity === 1 && !effects.length && !pushed.dx && !pushed.dy) return layers;
+    const state=transitionState(effects, width, height); state.x+=pushed.dx; state.y+=pushed.dy;
     const overlay=state.overlay && state.overlay.opacity > 0 ? [{ id: `dip:${scene.id}`, type: 'rect', startFrame: 0, x: 0, y: 0, width, height, fill: state.overlay.color, opacity: state.overlay.opacity, scale: 1, rotation: 0, originX: 0, originY: 0, zIndex: 0, visible: true, animations: [], evaluated: {}, localFrame } as unknown as EvaluatedLayer] : [];
-    return [{ id: `scene:${scene.id}`, type: 'group', startFrame: 0, x: state.x, y: state.y, opacity: state.opacity, scale: state.scale, rotation: 0, originX: width/2, originY: height/2, zIndex: 0, visible: true, animations: [], children: layers, clip: state.clip, clipPath: state.clipPath, blur: state.blur, evaluated: {}, localFrame } as EvaluatedLayer, ...overlay]; }); }
+    const transformed = { id: `scene:${scene.id}`, type: 'group', startFrame: 0, x: state.x, y: state.y, opacity: state.opacity, scale: state.scale, rotation: 0, originX: width/2, originY: height/2, zIndex: 0, visible: true, animations: [], children: layers, clip: state.clip, clipPath: state.clipPath, blur: state.blur, evaluated: {}, localFrame } as EvaluatedLayer;
+    const visual = [transformed, ...overlay];
+    if (opacity === 1) return visual;
+    return [{ ...transformed, id: `fade:${scene.id}`, x: 0, y: 0, scale: 1, opacity, clip: undefined, clipPath: undefined, blur: undefined, isolateOpacity: true, children: visual }]; }); }
 // Video sources are decoded on the composition's frame grid, so frame k of the source is shown at time k/fps. `ownFrame` is the
 // frame relative to the layer's own startFrame; past the end the source either loops or holds its last frame.
 export function videoFrameIndex(layer: { trimStart: number; playbackRate: number; loop: boolean }, ownFrame: number, frameCount: number): number { if (frameCount < 1) throw new Error('Video has no frames'); const frame=Math.max(0, Math.floor(layer.trimStart + ownFrame*layer.playbackRate + 1e-9)); return layer.loop ? frame % frameCount : Math.min(frame, frameCount-1); }

@@ -47,7 +47,7 @@ export function generateReactLaunchReelTsx(props: ReactLaunchReelProps): string 
   const safeCta = safe(ctaText);
   const safeUrl = safe(displayUrl);
   // The colour is written into the file as code too, so only a plain hex value is accepted.
-  const brandColor = /^#[0-9a-f]{6}$/i.test(props.brandColor) ? props.brandColor : '#6366f1';
+  const brandColor = /^#[0-9a-f]{6}$/i.test(props.brandColor) ? props.brandColor : '#38bdf8';
   const buttonInk = luminance(brandColor) > 0.179 ? '#000000' : '#ffffff';
 
   const isVertical = aspect === '9:16';
@@ -91,17 +91,6 @@ const THEME = {
     style === 'blueprint' ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' :
     'Inter, system-ui, -apple-system, sans-serif'
   }',
-  glowColors: ${
-    style === 'neon'
-      ? `['#f43f5e', '#8b5cf6', '#06b6d4']`
-      : style === 'terminal'
-      ? `['#10b981', '#06b6d4', '${brandColor}']`
-      : style === 'blueprint'
-      ? `['#00d2ff', '#0284c7', '#38bdf8']`
-      : style === 'editorial'
-      ? `['#d97706', '#92400e', '#78350f']`
-      : `['${brandColor}', '#6366f1', '#a855f7']`
-  },
 };
 
 export const config = {
@@ -238,9 +227,9 @@ export default function LaunchReel() {
       <AmbientGlow
         blur={120}
         orbs={[
-          { x: '20%', y: '18%', size: ${isVertical ? 680 : 850}, color: THEME.glowColors[0], opacity: 0.28, speed: 0.02, phase: 0 },
-          { x: '82%', y: '78%', size: ${isVertical ? 720 : 920}, color: THEME.glowColors[1], opacity: 0.22, speed: 0.025, phase: 2 },
-          { x: '50%', y: '88%', size: ${isVertical ? 550 : 700}, color: THEME.glowColors[2] || '#6366f1', opacity: 0.18, speed: 0.03, phase: 4 },
+          { x: '20%', y: '18%', size: ${isVertical ? 680 : 850}, color: THEME.brandColor, opacity: 0.28, speed: 0.02, phase: 0 },
+          { x: '82%', y: '78%', size: ${isVertical ? 720 : 920}, color: THEME.brandColor, opacity: 0.22, speed: 0.025, phase: 2 },
+          { x: '50%', y: '88%', size: ${isVertical ? 550 : 700}, color: THEME.brandColor, opacity: 0.18, speed: 0.03, phase: 4 },
         ]}
       />
 

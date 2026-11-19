@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtemp, readFile, rm, writeFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createLaunchReel, launchReelTagline } from '@ove/ai';
+import { createLaunchReel, generateReactLaunchReelTsx, launchReelTagline } from '@ove/ai';
 import { buildReact } from '../../packages/cli/src/build';
 
 describe('One-Click Screenshot-to-Launch-Reel Engine', () => {
@@ -67,6 +67,16 @@ describe('One-Click Screenshot-to-Launch-Reel Engine', () => {
     const long = 'A ministry for students and young adults from parishes and communities across Andhra Pradesh and Telangana.';
     expect(launchReelTagline(long)).toBe('');
     expect(launchReelTagline(`A ministry for young adults. ${long}`)).toBe('A ministry for young adults.');
+  });
+
+  it.each(['keynote', 'terminal', 'editorial', 'blueprint', 'neon', 'bento'] as const)('uses the brand color for every %s glow', style => {
+    const source = generateReactLaunchReelTsx({
+      style, targetName: 'Garden', brandColor: '#1f6f5c', tagline: '', ctaText: 'Visit the garden', displayUrl: '',
+      features: [], width: 1080, height: 1920, aspect: '9:16', fps: 30, hasVoice: false,
+    });
+    expect(source).toContain("brandColor: '#1f6f5c'");
+    expect(source.match(/color: THEME\.brandColor, opacity: [\d.]+, speed:/g)).toHaveLength(3);
+    expect(source).not.toMatch(/#6366f1|#a855f7/);
   });
 
   it('supports widescreen 16:9 and square 1:1 aspect ratios', async () => {

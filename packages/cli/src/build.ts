@@ -151,7 +151,9 @@ export const __render = (frame, props, cfg) => { let tree = __ce(__getComp(), pr
     const counts = new Map<string, number>();
     for (const tag of html.matchAll(/<i\b[^>]*data-ove-media="(audio|video)"[^>]*>/g)) {
       const attrs: Record<string, string> = {}; for (const a of tag[0].matchAll(/data-([a-z-]+)="([^"]*)"/g)) attrs[a[1]!] = a[2]!.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
-      const base = `${tag[1]}|${attrs.src}|${attrs.name}`, n = counts.get(base) ?? 0; counts.set(base, n + 1);
+      const identity = attrs.name || attrs.instance;
+      const base = JSON.stringify([tag[1], attrs.src, identity, attrs.start]);
+      const n = counts.get(base) ?? 0; counts.set(base, n + 1);
       const runs = seen.get(`${base}|${n}`) ?? []; seen.set(`${base}|${n}`, runs);
       const box = { x: Number(attrs.left) || 0, y: Number(attrs.top) || 0, width: Number(attrs.width) || Number(config.width), height: Number(attrs.height) || Number(config.height) };
       const run = runs[runs.length - 1];
