@@ -15,7 +15,7 @@ describe('motionrender_init', () => {
     const code = await handleAgentTool('motionrender_init', { dir: join(root, 'code') });
     expect(existsSync(join(root, 'code', 'video.tsx'))).toBe(true);
     expect(existsSync(join(root, 'code', 'composition.json'))).toBe(false);
-    expect(code?.content[0]?.text).toMatch(/Write video\.tsx/);
+    expect((code?.content[0] as { text: string }).text).toMatch(/Write video\.tsx/);
     await handleAgentTool('motionrender_init', { dir: join(root, 'json'), composition: true });
     expect(existsSync(join(root, 'json', 'composition.json'))).toBe(true);
     expect(existsSync(join(root, 'json', 'video.tsx'))).toBe(false);
