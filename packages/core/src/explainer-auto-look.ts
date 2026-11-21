@@ -37,7 +37,11 @@ function corpus(spec: Explainer): string {
 
 /** The family of design the subject points to: the one whose words appear most; a tie, or no match at all, is settled by the seed. */
 export function moodOf(spec: Explainer): { look: ExplainerLook; score: number } {
-  const text = corpus(spec), seed = hash(spec.topic);
+  return moodOfText(corpus(spec), spec.topic);
+}
+/** The same, from plain text (a brief) before there is a script. */
+export function moodOfText(corpus: string, seedText: string): { look: ExplainerLook; score: number } {
+  const text = ` ${corpus.toLowerCase()} `, seed = hash(seedText);
   const scored = explainerLooks.map(look => ({ look, score: MOOD[look].reduce((n, word) => n + (text.split(` ${word}`).length - 1), 0) }));
   const top = Math.max(...scored.map(item => item.score));
   const pool = top > 0 ? scored.filter(item => item.score === top) : scored;

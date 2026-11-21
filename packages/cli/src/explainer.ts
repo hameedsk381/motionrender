@@ -5,7 +5,7 @@ import { statSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { explainerExample, explainerKindDocs, explainerLookDefs, explainerLooks, explainerSchema, type Explainer } from '@ove/schema';
-import { compileExplainer, REACT_KINDS, type ExplainerAudio } from '@ove/core';
+import { compileExplainer, proposeOutline, REACT_KINDS, type ExplainerAudio } from '@ove/core';
 import { convertToReact } from './react-compose';
 import { fetchExplainerStock, needsStock } from './explainer-stock';
 import type { StockOptions } from '@ove/api';
@@ -78,6 +78,20 @@ function looksCommand(argv: string[]): void {
   console.log('\nPick one with "look" in the script; change parts of it with "design" ({ fontDisplay, fontBody, motion, transition, texture, corners, weight, layout }) and "colors".');
 }
 
+/** `mr explainer outline "<brief>"`: a scene sequence for the subject (which kinds, in what order, which drawings), so a script starts from the content and not a fixed list. */
+function outlineCommand(argv: string[]): void {
+  const brief = argv.slice(2).filter((word, i, all) => !word.startsWith('--') && all[i - 1] !== '--scenes').join(' ').trim();
+  if (!brief) throw new Error('Usage: mr explainer outline "<what the video should explain>" [--scenes 6] [--json]');
+  const count = option(argv, '--scenes') === undefined ? 6 : Number(option(argv, '--scenes'));
+  if (!Number.isInteger(count) || count < 3 || count > 9) throw new Error('--scenes must be a whole number from 3 to 9');
+  const outline = proposeOutline(brief, count);
+  if (argv.includes('--json')) { console.log(JSON.stringify(outline, null, 2)); return; }
+  console.log(`Proposed sequence for "${brief}" (the subject suggests the ${outline.look} family of design; leave "look" on auto):\n`);
+  outline.scenes.forEach((scene, i) => console.log(`${String(i + 1).padStart(2)}. ${scene.kind.padEnd(9)} ${scene.purpose}${scene.variants.length ? `\n    drawings: ${scene.variants.join(', ')}` : ''}`));
+  if (outline.note) console.log(`\n${outline.note}`);
+  console.log('\nWrite one scene per line of the story, pick a drawing for what each says, and see an example of a kind with: mr explainer kinds');
+}
+
 async function exampleCommand(argv: string[]): Promise<void> {
   const json = JSON.stringify(explainerExample(), null, 2) + '\n', output = option(argv, '--output');
   if (output) { await writeFile(resolve(output), json); console.log(`Wrote ${resolve(output)}\nNext: mr explainer compile ${output}`); } else process.stdout.write(json);
@@ -96,7 +110,8 @@ export async function runExplainer(argv: string[]): Promise<void> {
   if (action === 'kinds') return kindsCommand(argv);
   if (action === 'example') return exampleCommand(argv);
   if (action === 'looks') return looksCommand(argv);
-  if (action !== 'compile' && action !== 'validate') throw new Error('Usage: mr explainer write "<what to explain>" | kinds [--json] | looks [--json] | example [--output explainer.json] | validate <explainer.json> | compile <explainer.json> [--output composition.json] [--no-voice] [--voice <name>]');
+  if (action === 'outline') return outlineCommand(argv);
+  if (action !== 'compile' && action !== 'validate') throw new Error('Usage: mr explainer write "<what to explain>" | outline "<brief>" | kinds [--json] | looks [--json] | example [--output explainer.json] | validate <explainer.json> | compile <explainer.json> [--output composition.json] [--no-voice] [--voice <name>]');
   if (!file) throw new Error(`mr explainer ${action} needs an explainer file`);
   if (action === 'validate' && argv.includes('--json')) return validateJson(file);
   const spec = readExplainer(JSON.parse((await readFile(file, 'utf8')).replace(/^﻿/, '')));
