@@ -18,8 +18,9 @@ describe('agent instructions: the routes', () => {
     expect(text).toMatch(/mr init <dir>/);
   });
 
-  it('says the explainer shares one scene library and has the voice, code does not', () => {
+  it('says the explainer shares one scene library, and that the code route can be narrated with mr voice', () => {
     expect(text).toMatch(/every video shares the same scene library/);
-    expect(text).toMatch(/no voiceover/);
+    expect(text).toMatch(/mr voice/);
+    expect(text).toMatch(/Captions/);
   });
 });

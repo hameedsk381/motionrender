@@ -2,7 +2,7 @@
 // Layout from the content (a process is a path with stops); pictures from the illustration kit, so no image model or key is needed. Colours: newsprint cream, ink, one red.
 import { AbsoluteFill, Audio, Illustration, Sequence, springValue, useCurrentFrame } from 'motionrender/react';
 
-export const config = { id: 'bill', name: "A bill's long walk", width: 1080, height: 1920, fps: 30, durationInFrames: 420, background: '#f2ede2', grain: 0.04, export: { loudness: -14 } };
+export const config = { id: 'bill', name: "A bill's long walk", width: 1080, height: 1920, fps: 30, durationInFrames: 540, background: '#f2ede2', grain: 0.04, export: { loudness: -14 } };
 
 const ink = '#161513', muted = '#5f5b52', red = '#b3121f', cream = '#f2ede2', rule = '#d6cdb9';
 const serif = '"Playfair Display", serif', sans = 'Source Sans 3, sans-serif';
@@ -15,7 +15,10 @@ const stops = [
 ];
 const SIZE = 290, TOP = 600, GAP = 285, LEFT_X = 195, RIGHT_X = 815, IN = 60;   // pictures are large; the path starts and ends IN pixels inside them (they are drawn over it)
 const cx = (k: number) => (k % 2 === 0 ? LEFT_X : RIGHT_X), cy = (k: number) => TOP + k * GAP;
-const at = (k: number) => 44 + k * 78;
+// The voice: five lines recorded with `mr voice` (their lengths in frames), each starting a beat after the one before; a stop appears as its own line begins.
+const voice = [{ src: 'assets/line1.wav', frames: 66 }, { src: 'assets/line2.wav', frames: 75 }, { src: 'assets/line3.wav', frames: 116 }, { src: 'assets/line4.wav', frames: 69 }, { src: 'assets/line5.wav', frames: 129 }];
+const starts = voice.reduce<number[]>((list, line, i) => [...list, i === 0 ? 6 : list[i - 1]! + voice[i - 1]!.frames + 10], []);
+const at = (k: number) => starts[k + 1]!;
 
 /** A point on the S-curve between stop k and k+1, t from 0 to 1 (the cubic the path is drawn with). */
 function onPath(k: number, t: number): [number, number] {
@@ -32,13 +35,14 @@ export default function Video() {
   const frame = useCurrentFrame();
   const head = springValue({ frame, delay: 2, preset: 'smooth' });
   // The bill (a small document) walks the path: one segment between each pair of stops, starting as the stop above it appears.
-  const walk = Math.min(1, Math.max(0, (frame - 60) / 270)) * (stops.length - 1), seg = Math.min(stops.length - 2, Math.floor(walk)), [mx, my] = onPath(seg, walk - seg);
+  const walk = stops.slice(0, -1).reduce((sum, _, k) => sum + Math.min(1, Math.max(0, (frame - (at(k) + 30)) / (at(k + 1) - at(k) - 38))), 0), seg = Math.min(stops.length - 2, Math.floor(walk)), [mx, my] = onPath(seg, walk - seg);
   return (
     <AbsoluteFill style={{ fontFamily: sans, color: ink }}>
-      <Audio src="sfx:bed-calm" volume={0.8} />
-      <Sequence from={4} durationInFrames={30}><Audio src="sfx:whoosh" volume={0.35} /></Sequence>
+      <Audio src="sfx:bed-calm" volume={0.25} />
+      {voice.map((line, i) => <Sequence key={line.src} from={starts[i]!} durationInFrames={line.frames + 4}><Audio src={line.src} /></Sequence>)}
+      <Sequence from={2} durationInFrames={30}><Audio src="sfx:whoosh" volume={0.25} /></Sequence>
       {stops.map((_, k) => <Sequence key={k} from={at(k)} durationInFrames={20}><Audio src="sfx:pop" volume={0.35} /></Sequence>)}
-      <Sequence from={at(3) + 30} durationInFrames={40}><Audio src="sfx:thump" volume={0.45} /></Sequence>
+      <Sequence from={at(3) + 120} durationInFrames={40}><Audio src="sfx:thump" volume={0.3} /></Sequence>
 
       <div style={{ position: 'absolute', left: 80, top: 186, width: 840, fontFamily: serif, fontSize: 112, fontWeight: 800, lineHeight: 1.2, letterSpacing: -2, opacity: head, transform: `translateY(${(1 - head) * 30}px)` }}>
         <div>A bill&apos;s</div>

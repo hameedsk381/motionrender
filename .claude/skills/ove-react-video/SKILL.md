@@ -243,3 +243,18 @@ A scene about a subject should show the subject. Two sources, neither needs an i
 - **Real photos and clips:** `mr stock "solar panels" --kind photo --aspect 9:16` (or `--kind video`) finds one on Pixabay with your own free `PIXABAY_API_KEY`, saves it under `assets/`, lists the credit in `assets/credits.json` and prints what to write: add the entry it shows to `config.assets` (for example `assets: [{ id: 'photo-22', type: 'image', src: 'assets/pixabay-22.jpg' }]`), then use it by its id, `<Img src="photo-22" />` or `<Video src="video-31" muted />`. A picture that is not declared in `config.assets` renders as nothing; `mr make` reports it as an error (`image-missing`), and the build fails when a declared file is not in the project. Asking again for the same words reuses the file. Show the credit on screen or in the description.
 
 Use a real picture where the subject is a real place or thing (a coastline, a factory, a crowd), an illustration where it is an idea or a process (a vote, a cache, a handshake). Keep pictures out of the top 8% and bottom 18% of a 9:16 frame.
+
+### Narration
+
+Record each spoken line with `mr voice "A committee reviews it."` (free Edge voices such as `en-US-AriaNeural`; needs internet, no key; `--rate 10` speeds it up). It saves `assets/voice-xxxx.wav` and `assets/voice-xxxx.wav.words.json` (the time of every word), and prints how long the line is in frames. Then cut the video to the speech instead of guessing times:
+
+```tsx
+import words from './assets/line2.wav.words.json';
+const voice = [{ src: 'assets/line1.wav', frames: 66 }, { src: 'assets/line2.wav', frames: 75 }];
+const starts = voice.reduce<number[]>((list, line, i) => [...list, i === 0 ? 6 : list[i - 1]! + voice[i - 1]!.frames + 10], []);
+// a picture, a stop or a number appears at starts[i]; the line plays from there
+{voice.map((line, i) => <Sequence key={line.src} from={starts[i]!} durationInFrames={line.frames + 4}><Audio src={line.src} /></Sequence>)}
+<Sequence from={starts[1]!}><Captions words={words} color={ink} highlight={accent} style={{ position: 'absolute', left: 80, top: 1400, width: 760 }} /></Sequence>
+```
+
+Keep the music bed near `volume={0.25}` so the voice sits on top, keep captions inside the safe zones, and make the video as long as the last line plus a beat.

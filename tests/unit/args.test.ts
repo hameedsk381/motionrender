@@ -30,7 +30,7 @@ describe('command-line options', () => {
     expect(commandHelp(['--help'], usage)).toBe(usage);
   });
   it('recognises help anywhere and covers every command', () => { expect(wantsHelp(['render', '--help'])).toBe(true); expect(wantsHelp(['-h'])).toBe(true); expect(wantsHelp(['help'])).toBe(true); expect(wantsHelp(['render', 'v.json'])).toBe(false);
-    expect(Object.keys(commandSpecs).sort()).toEqual(['add', 'agent', 'ai', 'blocks', 'browser', 'build', 'cache', 'captions', 'dev', 'doctor', 'explainer', 'facts', 'figma', 'init', 'inspect', 'job-worker', 'launch-reel', 'make', 'mcp', 'plan', 'production', 'render', 'review', 'schema', 'script', 'serve', 'setup', 'soundtrack', 'still', 'stock', 'theme', 'thumbnail', 'track', 'validate', 'worker']); });
+    expect(Object.keys(commandSpecs).sort()).toEqual(['add', 'agent', 'ai', 'blocks', 'browser', 'build', 'cache', 'captions', 'dev', 'doctor', 'explainer', 'facts', 'figma', 'init', 'inspect', 'job-worker', 'launch-reel', 'make', 'mcp', 'plan', 'production', 'render', 'review', 'schema', 'script', 'serve', 'setup', 'soundtrack', 'still', 'stock', 'theme', 'thumbnail', 'track', 'validate', 'voice', 'worker']); });
   it('recognises version flags and command', () => {
     expect(wantsVersion(['--version'])).toBe(true);
     expect(wantsVersion(['-v'])).toBe(true);
