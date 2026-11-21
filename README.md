@@ -29,6 +29,7 @@ See [AGENTS.md](AGENTS.md) for the tool list and the production loop.
 ```sh
 # Run anywhere with npx (zero installation)
 npx motionrender init my-video                    # a code-first video.tsx; add --composition for a composition.json instead
+cd my-video && npm install --save-dev esbuild react react-dom && cd ..    # once: the build needs them
 npx motionrender make my-video/video.tsx          # builds it, checks the design, draws one contact sheet
 npx motionrender render my-video/video.tsx --output out.mp4
 
