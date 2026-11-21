@@ -32,14 +32,16 @@ type Transition = NonNullable<Composition['scenes'][number]['transitionIn']>;
 // iris clips to a circle (clipPath) growing from x, y to past the farthest corner; dip hides the scene for the first half and draws a
 // colour over everything (overlay) that peaks in the middle; blur goes in or out of focus while fading; push moves like slide (the scene
 // it pushes out is moved in evaluateFrame).
+// A whip's smear: zero at the cut's start and end, strongest in the middle of the move, a few percent of the frame.
+const whipBlur = (progress: number, width: number, height: number) => Math.sin(Math.PI*Math.min(1, Math.max(0, progress)))*0.03*Math.max(width, height);
 export function transitionState(effects: { transition: Transition; progress: number }[], width: number, height: number) { let x=0, y=0, opacity=1, scale=1, clip={ x: 0, y: 0, width, height }; let clipped=false, clipPath: string | undefined, blur=0, overlay: { color: string; opacity: number } | undefined;
-  for (const { transition, progress } of effects) { const p=ease(progress, transition.easing), dir=transition.direction;
+  for (const { transition, progress } of effects) { const p=ease(progress, transition.easing ?? (transition.type === 'whip' ? 'easeInOutCubic' : undefined)), dir=transition.direction;
     if (transition.type === 'fade') opacity*=p;
     else if (transition.type === 'zoom') { opacity*=p; scale*=0.85+0.15*p; }
     else if (transition.type === 'iris') { const cx=transition.x ?? width/2, cy=transition.y ?? height/2, r=Math.max(0.01, p*Math.hypot(Math.max(cx, width-cx), Math.max(cy, height-cy))); clipPath=`M${cx-r} ${cy}A${r} ${r} 0 1 0 ${cx+r} ${cy}A${r} ${r} 0 1 0 ${cx-r} ${cy}Z`; }
     else if (transition.type === 'dip') { if (progress < 0.5) opacity=0; overlay={ color: transition.color, opacity: 1-Math.abs(2*progress-1) }; }
     else if (transition.type === 'blur') { opacity*=Math.min(1, p*1.5); blur=Math.max(blur, (1-p)*0.02*Math.max(width, height)); }
-    else if (transition.type === 'slide' || transition.type === 'push') { if (dir === 'left') x-=(1-p)*width; else if (dir === 'right') x+=(1-p)*width; else if (dir === 'top') y-=(1-p)*height; else y+=(1-p)*height; }
+    else if (transition.type === 'slide' || transition.type === 'push' || transition.type === 'whip') { if (transition.type === 'whip') blur=Math.max(blur, whipBlur(progress, width, height)); if (dir === 'left') x-=(1-p)*width; else if (dir === 'right') x+=(1-p)*width; else if (dir === 'top') y-=(1-p)*height; else y+=(1-p)*height; }
     else { clipped=true; const visible=dir === 'left' ? { x: 0, y: 0, width: p*width, height } : dir === 'right' ? { x: (1-p)*width, y: 0, width: p*width, height } : dir === 'top' ? { x: 0, y: 0, width, height: p*height } : { x: 0, y: (1-p)*height, width, height: p*height };
       const left=Math.max(clip.x, visible.x), top=Math.max(clip.y, visible.y); clip={ x: left, y: top, width: Math.max(0, Math.min(clip.x+clip.width, visible.x+visible.width)-left), height: Math.max(0, Math.min(clip.y+clip.height, visible.y+visible.height)-top) }; } }
   return { x, y, opacity, scale, clip: clipped ? clip : undefined, clipPath, blur, overlay }; }
@@ -53,18 +55,18 @@ export function cameraState(camera: NonNullable<Composition['scenes'][number]['c
 // frame may be fractional (motion blur draws sub-frames between whole frames); layers and animations interpolate between frames.
 export function evaluateFrame(composition: Composition, frame: number): EvaluatedLayer[] { if(!Number.isFinite(frame) || frame < 0 || frame >= composition.durationFrames) return []; const { width, height }=composition;
   // A scene pushing in moves every scene listed before it that is still on screen out the same way, at the same speed.
-  const pushes=composition.scenes.map((scene, index) => ({ scene, index })).filter(({ scene }) => scene.transitionIn?.type === 'push' && frame >= scene.startFrame && frame < scene.startFrame+scene.transitionIn.durationFrames)
-    .map(({ scene, index }) => { const t=scene.transitionIn!, p=ease(Math.min(1, (frame-scene.startFrame)/t.durationFrames), t.easing), dir=t.direction; return { index, dx: dir === 'left' ? p*width : dir === 'right' ? -p*width : 0, dy: dir === 'top' ? p*height : dir === 'bottom' ? -p*height : 0 }; });
+  const pushes=composition.scenes.map((scene, index) => ({ scene, index })).filter(({ scene }) => (scene.transitionIn?.type === 'push' || scene.transitionIn?.type === 'whip') && frame >= scene.startFrame && frame < scene.startFrame+scene.transitionIn.durationFrames)
+    .map(({ scene, index }) => { const t=scene.transitionIn!, raw=Math.min(1, (frame-scene.startFrame)/t.durationFrames), p=ease(raw, t.easing ?? (t.type === 'whip' ? 'easeInOutCubic' : undefined)), dir=t.direction, blur=t.type === 'whip' ? whipBlur(raw, width, height) : 0; return { index, blur, dx: dir === 'left' ? p*width : dir === 'right' ? -p*width : 0, dy: dir === 'top' ? p*height : dir === 'bottom' ? -p*height : 0 }; });
   return composition.scenes.flatMap((scene, index) => { if(frame < scene.startFrame || frame >= scene.startFrame+scene.durationFrames) return []; const localFrame=frame-scene.startFrame; let layers=evaluateLayers(scene.layers, localFrame);
     // The camera: a group whose transform puts the camera's point at the frame's centre, zoomed and turned; fixed layers stay outside it.
     if (scene.camera) { const cam=cameraState(scene.camera, localFrame, width, height), moving=layers.filter(l => !l.fixed), fixed=layers.filter(l => l.fixed);
       layers=[{ id: `camera:${scene.id}`, type: 'group', startFrame: 0, x: width/2-cam.x, y: height/2-cam.y, originX: cam.x, originY: cam.y, scale: cam.zoom, rotation: -cam.rotation, opacity: 1, zIndex: 0, visible: true, fixed: false, animations: [], children: moving, evaluated: {}, localFrame } as unknown as EvaluatedLayer, ...fixed]; }
     const effects=[scene.transitionIn && { transition: scene.transitionIn, progress: Math.min(1, localFrame/scene.transitionIn.durationFrames) }, scene.transitionOut && { transition: scene.transitionOut, progress: Math.min(1, (scene.durationFrames-localFrame)/scene.transitionOut.durationFrames) }].filter((e): e is { transition: Transition; progress: number } => !!e && e.progress < 1);
-    const pushed=pushes.filter(p => p.index > index).reduce((o, p) => ({ dx: o.dx+p.dx, dy: o.dy+p.dy }), { dx: 0, dy: 0 });
+    const pushed=pushes.filter(p => p.index > index).reduce((o, p) => ({ dx: o.dx+p.dx, dy: o.dy+p.dy, blur: Math.max(o.blur, p.blur) }), { dx: 0, dy: 0, blur: 0 });
     const opacity = sceneOpacity(localFrame, scene.durationFrames, scene);
     if (opacity === 0) return [];
     if (opacity === 1 && !effects.length && !pushed.dx && !pushed.dy) return layers;
-    const state=transitionState(effects, width, height); state.x+=pushed.dx; state.y+=pushed.dy;
+    const state=transitionState(effects, width, height); state.x+=pushed.dx; state.y+=pushed.dy; state.blur=Math.max(state.blur, pushed.blur);
     const overlay=state.overlay && state.overlay.opacity > 0 ? [{ id: `dip:${scene.id}`, type: 'rect', startFrame: 0, x: 0, y: 0, width, height, fill: state.overlay.color, opacity: state.overlay.opacity, scale: 1, rotation: 0, originX: 0, originY: 0, zIndex: 0, visible: true, animations: [], evaluated: {}, localFrame } as unknown as EvaluatedLayer] : [];
     const transformed = { id: `scene:${scene.id}`, type: 'group', startFrame: 0, x: state.x, y: state.y, opacity: state.opacity, scale: state.scale, rotation: 0, originX: width/2, originY: height/2, zIndex: 0, visible: true, animations: [], children: layers, clip: state.clip, clipPath: state.clipPath, blur: state.blur, evaluated: {}, localFrame } as EvaluatedLayer;
     const visual = [transformed, ...overlay];

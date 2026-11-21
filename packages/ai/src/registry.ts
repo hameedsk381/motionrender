@@ -75,7 +75,7 @@ const components: Capability[] = [
     description: 'A macOS-style code window that highlights and reveals lines over time, for developer products.' },
 ];
 
-const transitions: Capability[] = ['fade', 'slide', 'wipe', 'zoom', 'iris', 'push', 'dip', 'blur'].map(type => ({
+const transitions: Capability[] = ['fade', 'slide', 'wipe', 'zoom', 'iris', 'push', 'dip', 'blur', 'whip'].map(type => ({
   id: `transition-${type}`, kind: 'effect' as const, name: `${type[0]!.toUpperCase()}${type.slice(1)} transition`, paths: ['json', 'react'], version: registryVersion, params: [{ name: 'durationFrames', type: 'number' }, { name: 'direction', type: 'string', description: 'slide/wipe/push: left, right, top or bottom' }],
   description: `Scene ${type} transition`, example: `"transitionIn": { "type": "${type}", "durationFrames": 15 }` }));
 

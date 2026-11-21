@@ -9,7 +9,7 @@ export type Easing = string | [number, number, number, number];
 export type Keyframe = { frame: number; value: number | string; easing?: Easing };
 export type Animation = { property: string; keyframes: Keyframe[]; repeat?: number; reverse?: boolean };
 export type Value<T = number> = T | string;
-export type Transition = { type: 'fade' | 'slide' | 'wipe' | 'zoom' | 'iris' | 'push' | 'dip' | 'blur'; durationFrames: number; direction?: 'left' | 'right' | 'top' | 'bottom'; easing?: Easing; color?: string };
+export type Transition = { type: 'fade' | 'slide' | 'wipe' | 'zoom' | 'iris' | 'push' | 'dip' | 'blur' | 'whip'; durationFrames: number; direction?: 'left' | 'right' | 'top' | 'bottom'; easing?: Easing; color?: string };
 
 /** What every layer accepts. Strings may hold {{expressions}}; anything else the schema allows can be passed too. */
 export type LayerOptions = { id?: string; x?: Value; y?: Value; opacity?: Value; rotation?: Value; scale?: Value; originX?: Value<number | 'center'>; originY?: Value<number | 'center'>;

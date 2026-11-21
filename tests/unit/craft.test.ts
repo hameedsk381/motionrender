@@ -27,6 +27,18 @@ describe('transitions', () => {
   it('push moves the scene before it out the same way', () => { const c = loadComposition(base([{ id: 'a', name: 'A', durationFrames: 30, layers: [{ id: 'r', type: 'rect', width: 1, height: 1 }] }, { id: 'b', name: 'B', durationFrames: 30, transitionIn: { type: 'push', direction: 'right', durationFrames: 10, easing: 'linear' }, layers: [{ id: 'r', type: 'rect', width: 1, height: 1 }] }]));
     const [a, b] = evaluateFrame(c, 25) as any[]; expect(a.id).toBe('scene:a'); expect(b.id).toBe('scene:b'); expect(a.x).toBeCloseTo(-100, 5); expect(b.x).toBeCloseTo(100, 5); });
 });
+describe('whip transition', () => {
+  const whip = (progress: number, easing?: string) => transitionState([{ transition: { type: 'whip', durationFrames: 10, direction: 'left', ...(easing ? { easing } : {}) } as any, progress }], 200, 100);
+  it('smears the scene mid-move and is sharp at both ends', () => { expect(whip(0, 'linear').blur).toBeCloseTo(0, 5); expect(whip(1, 'linear').blur).toBeCloseTo(0, 5); expect(whip(0.5, 'linear').blur).toBeCloseTo(0.03 * 200, 5); });
+  it('eases in and out unless told otherwise, so it hangs at the start and lands hard', () => { expect(whip(0.25).x).toBeLessThan(whip(0.25, 'linear').x); expect(whip(0.75).x).toBeGreaterThan(whip(0.75, 'linear').x); });
+  it('pushes the scene before it out and smears both', () => {
+    const c = loadComposition(base([{ id: 'a', name: 'A', durationFrames: 30, layers: [{ id: 'r', type: 'rect', width: 1, height: 1 }] }, { id: 'b', name: 'B', durationFrames: 30, transitionIn: { type: 'whip', direction: 'right', durationFrames: 10, easing: 'linear' }, layers: [{ id: 'r', type: 'rect', width: 1, height: 1 }] }]));
+    const [a, b] = evaluateFrame(c, 25) as any[];
+    expect(a.x).toBeCloseTo(-100, 5); expect(b.x).toBeCloseTo(100, 5); expect(a.blur).toBeGreaterThan(0); expect(b.blur).toBeCloseTo(a.blur, 5);
+    const [a0] = evaluateFrame(c, 20) as any[]; expect(a0.blur ?? 0).toBeCloseTo(0, 5);
+  });
+  it('is accepted by the schema and listed in the registry', () => { expect(() => loadComposition(base([{ id: 'a', name: 'A', durationFrames: 30, layers: [] }, { id: 'b', name: 'B', durationFrames: 30, transitionIn: { type: 'whip', direction: 'left', durationFrames: 8 }, layers: [] }]))).not.toThrow(); });
+});
 describe('sound effects', () => {
   it('has a recipe for every name and checks names', () => { expect(Object.keys(sfxRecipes).sort()).toEqual([...sfxNames].sort()); expect(sfxArgs('pop', 'x.wav').at(-1)).toBe('x.wav');
     const audio = (src: string) => parseComposition({ ...base([{ id: 's', name: 'S', startFrame: 0, durationFrames: 30, layers: [{ id: 'a', type: 'audio', src }] }]), durationFrames: 30 });

@@ -20,7 +20,7 @@ export type CompositionData = { width: number; height: number; fps: number; dura
 const supportedTypes = new Set(['rect', 'circle', 'path', 'text', 'image', 'group', 'audio', 'react', 'captions']);
 /** The frame rate of the composition being drawn: a captions layer reads time in seconds, a layer has only frames. Set by CompositionView at the start of every render. */
 let drawingFps = 30;
-const supportedTransitions = new Set(['fade', 'slide', 'zoom', 'wipe', 'push', 'dip', 'blur']);
+const supportedTransitions = new Set(['fade', 'slide', 'zoom', 'wipe', 'push', 'dip', 'blur', 'whip']);
 
 /** What in a composition this view cannot draw yet, in words. Empty means the composition converts without losing anything. */
 export function unsupportedFeatures(composition: CompositionData): string[] {
@@ -322,6 +322,7 @@ export function sceneStyle(t: ReturnType<typeof transitionAt>, width: number, he
   const dist = (axis === 'x' ? width : height) * off * (t.direction === 'left' || t.direction === 'top' ? -1 : 1);
   switch (t.type) {
     case 'fade': style.opacity = p; break;
+    case 'whip': style.filter = `blur(${Math.sin(Math.PI * p) * 0.03 * Math.max(width, height)}px)`; style.transform = axis === 'x' ? `translateX(${dist}px)` : `translateY(${dist}px)`; break;
     case 'slide': case 'push': style.transform = axis === 'x' ? `translateX(${dist * (t.entering ? 1 : 1)}px)` : `translateY(${dist}px)`; break;
     case 'zoom': style.opacity = p; style.transform = `scale(${t.entering ? 0.5 + 0.5 * p : 1 + 0.5 * off})`; break;
     case 'blur': style.opacity = p; style.filter = `blur(${off * 30}px)`; break;
