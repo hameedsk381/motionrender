@@ -12,7 +12,7 @@ Usage:
   motionrender <command> [options] (aliases: mr, ove)
 
 Commands:
-  mr init <dir> [--force] [--no-skill]
+  mr init <dir> [--force] [--no-skill] [--composition]   a code-first video.tsx project (--composition: a composition.json one)
   mr schema [--explainer] [--output composition.schema.json]   the JSON Schema of a composition, or of an explainer script
   mr doctor                      check Node, FFmpeg encoders and the browser
   mr cache size|clean [--older-than 30d]   show or free the cache of decoded video, media measurements and sound effects
@@ -154,7 +154,7 @@ Press Ctrl+C to stop.`);
     const stop=() => { worker.close().finally(() => process.exit(0)); }; process.once('SIGINT', stop); process.once('SIGTERM', stop); }
   else if (command === 'browser') { if (file !== 'install') throw new Error('Usage: ove browser install'); console.log('Downloading Playwright Chromium…'); await ensureChromium(); }
   else if (command === 'schema') { const json=JSON.stringify(argv.includes('--explainer') ? explainerJsonSchema : compositionJsonSchema,null,2)+'\n'; const output=option('--output'); if (output) { await writeFile(resolve(output),json); console.log(`Wrote ${resolve(output)}`); } else process.stdout.write(json); }
-  else if (command === 'init') { if (!file || file.startsWith('--')) throw new Error(usage); const files=await initProject(file,{force:flag('--force'),skill:!flag('--no-skill'),react:flag('--react')}); console.log(`Created ${resolve(file)}\n${files.map(f=>`  ${f}`).join('\n')}\n\nNext:\n${flag('--react') ? `  mr make ${file}/video.tsx                       (checks it and draws one contact sheet)\n  mr render ${file}/video.tsx --output ${file}/out.mp4` : `  ove still ${file}/composition.json --frame 45 --output still.png\n  ove render ${file}/composition.json --output ${file}/out.mp4 --var title="Hi there"`}`); }
+  else if (command === 'init') { if (!file || file.startsWith('--')) throw new Error(usage); const files=await initProject(file,{force:flag('--force'),skill:!flag('--no-skill'),react:!flag('--composition')}); console.log(`Created ${resolve(file)}\n${files.map(f=>`  ${f}`).join('\n')}\n\nNext:\n${!flag('--composition') ? `  mr make ${file}/video.tsx                       (checks it and draws one contact sheet)\n  mr render ${file}/video.tsx --output ${file}/out.mp4` : `  ove still ${file}/composition.json --frame 45 --output still.png\n  ove render ${file}/composition.json --output ${file}/out.mp4 --var title="Hi there"`}`); }
   else if (command === 'dev') { if (!file || file.startsWith('--')) throw new Error(usage); const port=option('--port') === undefined ? undefined : Number(option('--port')); if (port !== undefined && !(Number.isInteger(port) && port > 0 && port < 65536)) throw new Error('--port must be a port number');
     const allowHosts=argv.flatMap((arg, i) => arg === '--allow-host' && argv[i+1] ? [argv[i+1]!] : []); const dev=await startDevServer(file, { port, values: await suppliedValues(), allowHosts, allowCode: flag('--allow-code'), aspect: option('--aspect') }); console.log(`Previewing ${resolve(file)}\n  ${dev.url}\nSaving the file reloads the preview. Press Ctrl+C to stop.`);
     const stop=() => { dev.close().finally(() => process.exit(0)); }; process.once('SIGINT', stop); process.once('SIGTERM', stop); }
