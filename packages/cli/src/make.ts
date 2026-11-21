@@ -9,6 +9,7 @@ import { compileVideoPlan, defaultConcurrency, loadComposition, parseVideoMarkdo
 import { buildExplainer } from './explainer';
 import { buildVideoSource } from './build';
 import { verifyVideo, type VideoCheck } from './verify-video';
+import { loadMotionAssertions, motionFileFor } from './motion-file';
 
 export type MakeRender = 'draft' | 'final';
 export type MakeOptions = {
@@ -98,7 +99,9 @@ export async function makeVideo(options: MakeOptions): Promise<MakeResult> {
   // 2. Review: automated checks and one contact sheet of the whole video.
   started = Date.now();
   log('Checking the design and drawing the contact sheet…');
-  const reviewed = await reviewComposition(composition, { baseDir, allowCode, every: options.every });
+  const motion = await loadMotionAssertions(file).catch((error: Error) => { notes.push(`Motion assertions not used: ${error.message}`); return undefined; });
+  if (motion?.length) notes.push(`Checking ${motion.length} motion assertion${motion.length === 1 ? '' : 's'} from ${motionFileFor(file).split(/[\\/]/).pop()}.`);
+  const reviewed = await reviewComposition(composition, { baseDir, allowCode, every: options.every, motion });
   const sheet = resolve(options.sheet ?? join(baseDir, 'review.png'));
   await writeFile(sheet, reviewed.sheet);
   timings.review = seconds(started);

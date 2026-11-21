@@ -9,4 +9,16 @@
 - **Cut to the content.** Scene length follows the beat of the story (or the spoken line), not a fixed number of seconds.
 - **No flashing.** Avoid letter-by-letter typing and per-word flicker on text people have to read.
 - **Pure in the frame.** Every value is a function of `useCurrentFrame()`: no `useState`, timers or `Math.random()` (use `random('seed')`).
+- **Declare what must be true of the motion.** Put a `video.motion.json` beside the video (`explainer.motion.json`, `composition.motion.json`); `mr make` and `mr review` check it on the real frames and fail each broken line:
+
+```json
+{ "assertions": [
+  { "appearsBy":    { "text": "Solar got cheap", "seconds": 1 } },
+  { "before":       { "first": "Hand-built", "then": "Factories scale" } },
+  { "staysInFrame": { "text": "Mass production" } },
+  { "keepsMoving":  { "from": 1, "to": 12, "every": 2 } }
+] }
+```
+
+  `appearsBy`: the text is in view (opaque, uncovered, inside the frame) by that second (or `frame`). `before`: one text is in view before another. `staysInFrame`: from when it appears, the text never leaves the frame (`to` ends the check at a time). `keepsMoving`: the picture never stands still for longer than `every` seconds (default 2) between `from` and `to`. Text is found by what it says, a part of it in any case. Write them while you plan the video: they are the brief for the motion, and they catch a title that comes in late or a card that slides off the edge.
 - **Sound follows the picture.** A pop as each item lands, a whoosh on a move, a thump on the final number; each in a `<Sequence>` long enough to play it.

@@ -97,3 +97,47 @@ export default function Video() { const frame = useCurrentFrame(); return <Absol
     expect(makeReport(result)).not.toMatch(/Frame 0 is only the background/);
   }, 240_000);
 });
+
+// Motion assertions: requirements a video declares about its own timeline in video.motion.json, judged by the review on the real frames.
+describe('make with motion assertions', () => {
+  const film = `import { AbsoluteFill, useCurrentFrame } from 'motionrender/react';
+export const config = { id: 'motion', width: 540, height: 960, fps: 30, durationInFrames: 120, background: '#f4efe4', export: { loudness: -16 } };
+export default function Video() { const f = useCurrentFrame(); const t = { position: 'absolute' as const, fontSize: 56, fontWeight: 700, lineHeight: 1.2, left: 40 };
+  return <AbsoluteFill style={{ fontFamily: 'Inter, sans-serif', color: '#1b1b1b' }}>
+    <div style={{ ...t, top: 120 }}>Early title</div>
+    <div style={{ ...t, top: 360, opacity: f < 45 ? 0 : 1 }}>Late title</div>
+    <div style={{ ...t, top: 600, left: 40 + f * 7 }}>Slider text</div>
+  </AbsoluteFill>; }
+`;
+  const project = async (name: string, assertions: object[], source = film) => {
+    const root = join(dir, name); await mkdir(root, { recursive: true });
+    await writeFile(join(root, 'video.tsx'), source); await writeFile(join(root, 'video.motion.json'), JSON.stringify({ assertions }));
+    return join(root, 'video.tsx');
+  };
+
+  it('is quiet when every assertion holds, and says it checked them', async () => {
+    const result = await makeVideo({ file: await project('holds', [{ appearsBy: { text: 'Early title', seconds: 0.5 } }, { before: { first: 'Early title', then: 'Late title' } }]), every: 15 });
+    expect(makeReport(result)).not.toMatch(/must be in view by|must come before|leaves the frame at|is never in view/);   // (the film's slider runs off the edge on purpose, which the ordinary review reports)
+    expect(makeReport(result)).toMatch(/Checking 2 motion assertions from video\.motion\.json/);
+  }, 240_000);
+
+  it('fails an appearsBy deadline, an order that is the wrong way round, and text that leaves the frame', async () => {
+    const result = await makeVideo({ file: await project('breaks', [{ appearsBy: { text: 'Late title', seconds: 1 } }, { before: { first: 'Late title', then: 'Early title' } }, { staysInFrame: { text: 'Slider text' } }]), every: 15 });
+    const report = makeReport(result);
+    expect(result.ok).toBe(false);
+    expect(report).toMatch(/"Late title" must be in view by 1\.0 s but first is at 1\.\d s/);
+    expect(report).toMatch(/"Late title" must come before "Early title"/);
+    expect(report).toMatch(/"Slider text" leaves the frame at \d\.\d s/);
+  }, 240_000);
+
+  it('fails a picture that stands still for longer than allowed', async () => {
+    const still = film.replace('left: 40 + f * 7', 'left: 40').replace("opacity: f < 45 ? 0 : 1", 'opacity: 1');
+    const result = await makeVideo({ file: await project('still', [{ keepsMoving: { from: 0.5, to: 3.5, every: 1 } }], still), every: 15 });
+    expect(makeReport(result)).toMatch(/The picture does not change from .* longer than the 1 s allowed/);
+  }, 240_000);
+
+  it('names what is wrong with a motion file instead of ignoring it', async () => {
+    const source = await project('bad', [{ appearsBy: { text: 'Early title' } }]);
+    expect(makeReport(await makeVideo({ file: source, every: 30 }))).toMatch(/Motion assertions not used: motion assertion 1: appearsBy needs either "seconds" or "frame"/);
+  }, 240_000);
+});

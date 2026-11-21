@@ -3,13 +3,13 @@
 // colours; long stretches where nothing moves; scenes of identical length; mixed transition styles; shared text teleporting across a hard
 // cut; text on screen too briefly to read; several headlines competing; caption lines too fast to read; sounds cut off mid-phrase; and, when
 // there is sound, loudness. It also makes a contact sheet. The checks are leads for a person or agent looking at the sheet, not a verdict on taste.
-import { storyboardSchema, type Storyboard, type Composition } from '@ove/schema'; import { createRenderer, defaultConcurrency } from '@ove/renderer'; import type { FrameReport, TextNote } from '@ove/graphics'; import { measureLoudness, sourceOf } from './audio'; import { captionTrack, measureSource } from './media'; import { layerWindows } from '@ove/timeline';
+import { storyboardSchema, type Storyboard, type Composition } from '@ove/schema'; import { createRenderer, defaultConcurrency } from '@ove/renderer'; import type { FrameReport, TextNote } from '@ove/graphics'; import { measureLoudness, sourceOf } from './audio'; import { captionTrack, measureSource } from './media'; import { layerWindows } from '@ove/timeline'; import { checkMotionAssertions, motionFrames, type MotionAssertion } from './motion-assertions';
 export type ReviewIssue = { severity: 'error' | 'warning' | 'info'; code: string; message: string; frame?: number; layer?: string; suggestion?: Record<string, unknown> };
 export type ReviewResult = { checkpoints?: (Storyboard & { scene: string; frame: number; motionFrames: number[] })[]; scope?: 'composition-technical'; creativeQuality?: 'unassessed'; issues: ReviewIssue[]; sheet: Buffer; sheetFrames: number[]; sampledFrames: number; loudness?: { integrated: number; truePeak: number } };
 export type ReviewRepairTask = { id: string; severity: ReviewIssue['severity']; target: { sceneId?: string; beatId?: string; layer?: string; frame?: number }; category: 'layout' | 'copy' | 'motion' | 'audio' | 'continuity' | 'style'; instruction: string; issues: ReviewIssue[] };
 export type SafeZone = { top?: number; bottom?: number; left?: number; right?: number };
 export type ReviewTarget = 'social' | 'web';
-export type ReviewOptions = { allowCode?: boolean; baseDir?: string; every?: number; sheetFrames?: number; columns?: number; concurrency?: number; audio?: boolean; target?: ReviewTarget; safeZone?: SafeZone; showSafeZones?: boolean; onProgress?: (done: number, total: number) => void };
+export type ReviewOptions = { allowCode?: boolean; baseDir?: string; every?: number; sheetFrames?: number; columns?: number; concurrency?: number; audio?: boolean; target?: ReviewTarget; safeZone?: SafeZone; showSafeZones?: boolean; /** Requirements about the motion (from a video.motion.json), judged on the real frames. */ motion?: MotionAssertion[]; onProgress?: (done: number, total: number) => void };
 
 const area = (a: TextNote) => Math.max(0, a.x1 - a.x0) * Math.max(0, a.y1 - a.y0);
 type Rect = { x0: number; y0: number; x1: number; y1: number };
@@ -87,6 +87,7 @@ export async function reviewComposition(composition: Composition, options: Revie
     if (!frames.includes(frame)) frames.push(frame);
     if (!sheetFrames.includes(frame)) sheetFrames.push(frame);
   }
+  for (const frame of motionFrames(options.motion ?? [], fps, durationFrames)) if (!frames.includes(frame)) frames.push(frame);   // an appearsBy deadline is judged at that exact frame
   frames.sort((a, b) => a - b);
   sheetFrames.sort((a, b) => a - b);
   const web = options.target === 'web';
@@ -155,6 +156,8 @@ export async function reviewComposition(composition: Composition, options: Revie
     const median = covered[Math.floor(covered.length / 2)];
     if (covered.length >= 4 && median !== undefined && median < 0.5) issues.push({ severity: 'info', code: 'empty-frame', message: `The picture fills only about ${Math.round(median * 100)}% of the usable height in most frames: scale it up, or give it more to show, so the frame does not look empty` });
   }
+  // Motion assertions the video declares about itself: judged on the same frames, each failure an error.
+  if (options.motion?.length) for (const issue of checkMotionAssertions(options.motion, reports, frames, change, fps, width, height)) issues.push(issue);
   // The first frame is often the thumbnail (feeds and players show it before anything plays): if it is only the background, the video is advertised by an empty picture.
   if (firstFrame) {
     const { width: w, height: h, pixels } = firstFrame.thumb, corners = [pixels[0]!, pixels[w - 1]!, pixels[(h - 1) * w]!, pixels[h * w - 1]!].sort((a, b) => a - b), ground = (corners[1]! + corners[2]!) / 2;
