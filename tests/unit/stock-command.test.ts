@@ -27,7 +27,8 @@ describe('mr stock', () => {
     const got = await stockAsset(dir, 'solar panels', 'photo', '9:16', { fetch: standIn });
     expect(got).toMatchObject({ file: 'assets/pixabay-22.jpg', credit: 'Photo: tall_bob on Pixabay', reused: false });
     expect(existsSync(join(dir, got.file))).toBe(true);
-    expect(got.snippet).toContain('<Img src="assets/pixabay-22.jpg"');
+    expect(got.asset).toBe("{ id: 'photo-22', type: 'image', src: 'assets/pixabay-22.jpg' }");
+    expect(got.snippet).toContain('<Img src="photo-22"');
     expect(JSON.parse(readFileSync(join(dir, 'assets', 'credits.json'), 'utf8'))).toEqual([expect.objectContaining({ file: 'assets/pixabay-22.jpg', author: 'tall_bob', query: 'solar panels' })]);
   });
 

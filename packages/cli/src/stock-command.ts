@@ -9,7 +9,7 @@ import { creditLine, fetchStockAsset, orientationFor } from './explainer-stock';
 
 const option = (argv: string[], name: string) => { const index = argv.indexOf(name); return index < 0 ? undefined : argv[index + 1]; };
 
-export type StockCommandResult = { file: string; credit: string; pageUrl: string; license: string; reused: boolean; snippet: string };
+export type StockCommandResult = { file: string; credit: string; pageUrl: string; license: string; reused: boolean; /** The entry for config.assets: a picture or clip is used by its id. */ asset: string; snippet: string };
 
 /** Finds, downloads and credits one asset in `dir`/assets; `stock` points tests at a stand-in for the libraries. */
 export async function stockAsset(dir: string, query: string, kind: 'photo' | 'video', aspect: '9:16' | '1:1' | '4:5' | '16:9', stock?: Partial<StockOptions>): Promise<StockCommandResult> {
@@ -24,8 +24,9 @@ export async function stockAsset(dir: string, query: string, kind: 'photo' | 'vi
     list.push({ file: path, credit, author: choice.result.author, ...(choice.result.authorUrl ? { authorUrl: choice.result.authorUrl } : {}), pageUrl: choice.result.pageUrl, license: choice.result.license, query });
     await writeFile(creditsFile, JSON.stringify(list, null, 2) + '\n');
   }
-  const snippet = kind === 'video' ? `<Video src="${path}" muted />` : `<Img src="${path}" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />`;
-  return { file: path, credit, pageUrl: choice.result.pageUrl, license: choice.result.license, reused, snippet };
+  const id = `${kind}-${String(choice.result.id)}`, asset = `{ id: '${id}', type: '${kind === 'video' ? 'video' : 'image'}', src: '${path}' }`;
+  const snippet = kind === 'video' ? `<Video src="${id}" muted />` : `<Img src="${id}" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />`;
+  return { file: path, credit, pageUrl: choice.result.pageUrl, license: choice.result.license, reused, asset, snippet };
 }
 
 export async function runStock(argv: string[]): Promise<void> {
@@ -36,5 +37,5 @@ export async function runStock(argv: string[]): Promise<void> {
   if (!['9:16', '1:1', '4:5', '16:9'].includes(aspect)) throw new Error('--aspect must be 9:16, 1:1, 4:5 or 16:9');
   const result = await stockAsset(option(argv, '--dir') ?? '.', query, kind, aspect);
   if (argv.includes('--json')) { console.log(JSON.stringify(result, null, 2)); return; }
-  console.log(`${result.reused ? 'Reused' : 'Saved'} ${result.file}\n  ${result.credit} (${result.license})\n  ${result.pageUrl}\n\nIn video.tsx:\n  ${result.snippet}\n\nShow the credit on screen or in the description; every credit is listed in assets/credits.json.`);
+  console.log(`${result.reused ? 'Reused' : 'Saved'} ${result.file}\n  ${result.credit} (${result.license})\n  ${result.pageUrl}\n\nDeclare it in config (a picture or clip is used by its id):\n  assets: [${result.asset}]\nThen in video.tsx:\n  ${result.snippet}\n\nShow the credit on screen or in the description; every credit is listed in assets/credits.json.`);
 }
