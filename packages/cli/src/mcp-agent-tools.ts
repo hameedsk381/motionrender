@@ -114,8 +114,8 @@ export const AGENT_TOOLS = [
   },
   {
     name: 'motionrender_init',
-    description: 'Start a project folder: a starter composition.json, its JSON Schema, and the agent instructions and skills for Claude Code, Codex and Cursor. Fails if the folder is not empty unless force is true.',
-    inputSchema: { type: 'object', properties: { dir: { type: 'string', description: 'Folder to create' }, force: { type: 'boolean' } }, required: ['dir'] },
+    description: 'Start a project folder: by default a code-first video.tsx (a React video, the route for a video made for its subject), or with composition: true a starter composition.json and its JSON Schema. Both include the agent instructions and skills for Claude Code, Codex and Cursor. Fails if the folder is not empty unless force is true.',
+    inputSchema: { type: 'object', properties: { dir: { type: 'string', description: 'Folder to create' }, force: { type: 'boolean' }, composition: { type: 'boolean', description: 'Start from a composition.json instead of a video.tsx' } }, required: ['dir'] },
   },
 ];
 
@@ -278,8 +278,8 @@ export async function handleAgentTool(name: string, args: Record<string, any>): 
     case 'motionrender_init': {
       const dir = resolve(String(args.dir || ''));
       if (!args.dir) throw new Error('dir is required');
-      const files = await initProject(dir, { force: args.force === true });
-      return reply(`Created ${dir} (${files.length} files). Start with composition.json, or write explainer.json (motionrender_explainer_kinds). Instructions for agents are in AGENTS.md and the skills are in .claude/skills and .agent/skills.`);
+      const composition = args.composition === true, files = await initProject(dir, { force: args.force === true, react: !composition });
+      return reply(`Created ${dir} (${files.length} files). ${composition ? 'Start with composition.json, or write explainer.json (motionrender_explainer_kinds).' : 'Write video.tsx so its layout is made for the content, then motionrender_make_video on it; or write explainer.json for a quick narrated video (motionrender_explainer_kinds).'} Instructions for agents are in AGENTS.md and the skills are in .claude/skills and .agent/skills.`);
     }
 
     default:

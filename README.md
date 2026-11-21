@@ -28,9 +28,9 @@ See [AGENTS.md](AGENTS.md) for the tool list and the production loop.
 
 ```sh
 # Run anywhere with npx (zero installation)
-npx motionrender init my-video
-npx motionrender dev my-video/composition.json
-npx motionrender render my-video/composition.json --output out.mp4
+npx motionrender init my-video                    # a code-first video.tsx; add --composition for a composition.json instead
+npx motionrender make my-video/video.tsx          # builds it, checks the design, draws one contact sheet
+npx motionrender render my-video/video.tsx --output out.mp4
 
 # Or launch the AI Studio UI
 npx motionrender ai studio
@@ -52,13 +52,13 @@ pnpm test
 
 ```sh
 pnpm mr init my-video
-pnpm mr still my-video/composition.json --frame 45 --output still.png
-pnpm mr render my-video/composition.json --output my-video/out.mp4
+pnpm mr make my-video/video.tsx
+pnpm mr render my-video/video.tsx --output my-video/out.mp4
 ```
 
 Text uses Inter by default, an open-licence font built into MotionRender, so videos look the same on every machine with no fonts installed. Compositions can set a gradient `background` and `grain` (moving film grain). Text can animate word by word, letter by letter or line by line (`split`, with presets such as `rise`, `pop`, `blur` and `typewriter`), and `export.loudness` (or `--loudness -14`) makes the sound a set loudness. A `react` layer draws a React component every frame (flexbox, grid, rich text, inline SVG, live counters), written with `mr build video.tsx` ([examples/react-video](examples/react-video)). Lottie animations play frame-exactly, GLSL shaders (Shadertoy code included) fill boxes with animated textures, and groups can lay their children out in rows and columns ([examples/expressive](examples/expressive/composition.json)). A scene `camera` pans, zooms, turns and shakes the whole scene (layers marked `fixed`, such as captions, stay put), and `motionBlur` blurs fast motion like a film camera. Paths can morph from one shape into another, transitions include iris, push, dip and blur, `sfx:whoosh` and six other built-in sound effects need no files, a `tempo` gives expressions `beat()`, `bar()` and `beats()` so cuts land on the music, and captions drop filler words and can emphasise key words.
 
-`init` creates a 1920×1080, five-second starter that renders as-is:
+`init` creates a code-first starter that renders as-is: `video.tsx`, a React component that is the video. Write the layout for your content: the one picture that tells the story is the page, and the palette and type come from the subject. Pass `--composition` for the older starter, a 1920×1080, five-second `composition.json`:
 
 - `composition.json`, the video. Edit it to make your own.
 - `composition.schema.json`, so editors autocomplete and check the file (`composition.json` points at it through `$schema`).
@@ -125,11 +125,11 @@ Compositions can also take lists and build layers from them: `{{ }}` holds expre
 
 ## Making a video with a coding agent
 
-Run `pnpm mr init my-video`, open `my-video` in your agent, and describe the video you want. The skill tells the agent to edit `composition.json`, run `mr validate`, look at frames with `mr still`, check the whole video with `mr review`, and only then `mr render`. The skill source lives in [packages/cli/skills/ove/SKILL.md](packages/cli/skills/ove/SKILL.md).
+Run `pnpm mr init my-video`, open `my-video` in your agent, and describe the video you want. The agent writes `video.tsx` so the layout, colours and type are made for that content (not taken from a fixed set of scenes), runs `mr make video.tsx` to build it, check the design and draw one contact sheet, fixes what it lists, and only then runs `mr render`. For a quick narrated lesson it can write an `explainer.json` instead (next section); for the older JSON route it edits `composition.json` and uses `mr validate`, `mr still` and `mr review`. The skill source lives in [packages/cli/skills/ove/SKILL.md](packages/cli/skills/ove/SKILL.md).
 
 ## Explainer videos (no AI key needed)
 
-An explainer is a short vertical video that teaches one idea. You, or your agent, write a script of scenes and spoken lines, not coordinates; MotionRender draws it, records the voice, checks the design and renders it. The model that writes the script is the one you are already talking to.
+The explainer is the quick route: a narrated lesson built from a fixed library of scene kinds, so every explainer shares one scene library and one frame. Use it for drafts and short lessons; for a video that must look made for its subject, write a `video.tsx` (see above). An explainer is a short vertical video that teaches one idea. You, or your agent, write a script of scenes and spoken lines, not coordinates; MotionRender draws it, records the voice, checks the design and renders it. The model that writes the script is the one you are already talking to.
 
 ```sh
 pnpm mr explainer kinds               # every scene kind, each with a valid example
@@ -295,7 +295,7 @@ The other three are larger and more established: Remotion and HyperFrames have t
 
 | Command | What it does |
 |---|---|
-| `mr init <dir> [--force] [--no-skill]` | Scaffold a starter project |
+| `mr init <dir> [--force] [--no-skill] [--composition]` | Scaffold a code-first `video.tsx` project (`--composition`: a `composition.json` starter) |
 | `mr schema [--output file]` | Print or write the composition JSON Schema |
 | `mr cache size\|clean [--older-than 30d]` | Show or free the cache of decoded video, media measurements and sound effects (`OVE_CACHE_DIR`, default the system temp folder) |
 | `mr doctor` | Check Node, FFmpeg (and the encoders each format needs), ffprobe and the browser |

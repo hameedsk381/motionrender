@@ -212,3 +212,25 @@ Use `<Video />` to place video clips under or over your components:
    * Set `export: { loudness: -16 }` (-14 for vertical social) in `config`, or the review warns the mix is quiet. Give every `sfx:` `<Sequence>` enough frames to play the sound, and avoid typed or per-letter text effects: they read as flashing text.
 4. **Pure Function Rule**: Every render MUST be a pure deterministic function of `frame`. Do NOT use `useState`, `setTimeout`, or `Math.random()`. Use `random('seed')` from `motionrender/react` for repeatable randomness.
 
+---
+
+## 7. Let the content decide the layout (the default for a video about a topic)
+
+A video about a topic must not come out as headline, cards and a button. Decide in this order, and write the layout fresh each time:
+
+1. **Find the one picture that tells the story and make it the page.**
+
+| The content is | The page is |
+|---|---|
+| a cost, rate or score changing over time | a line or bars that fill the frame, with the story pinned to the points (a headline above, the final number below) |
+| a process or a journey | a path with named stops that a marker travels along |
+| two options or a before and after | two halves, each its own colour, filling the frame |
+| a single figure that matters | the figure as giant type on a band that runs to both edges |
+| a history | a line you travel along, with each event pinned where it happened |
+| a share of a whole | one ring or a stack of blocks, labelled directly, not in a legend |
+
+2. **Take the palette and type from the subject.** News: cream, ink and one red with a serif. Security: black and phosphor with mono. Climate: deep green and gold. Finance: deep blue and one warm accent. A brand: its own colours. One accent, one display face, one body face from the built-in set.
+3. **Set the pace from the beats of the story**, not a fixed scene count: a short idea is ten seconds, not thirty.
+4. **Check it does not look like your last video.** If the page structure repeats, start the layout again before you adjust any colour.
+
+The shape of a chart-as-page, for a falling cost (9:16): a headline of two lines at the top, an `<svg>` the width of the frame whose `path` draws on with `pathLength={1}`, `strokeDasharray={1}` and `strokeDashoffset={1 - draw}` (`draw` from `springValue`), pins that pop in when the line reaches them, then the number counting up with `NumberTicker`. Keep pin labels clear of the line, and keep all text out of the safe-zone bands.
