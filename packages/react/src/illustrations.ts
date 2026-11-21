@@ -111,7 +111,7 @@ export function Illustration({ name, size = 320, color = '#e0541b', ink = '#1c1a
       const role = shape.fill ?? 'none';
       return h('path', {
         key: i, d: shape.d, fill: paint(role), fillOpacity: (role === 'soft' ? 0.22 : 1) * fillIn, stroke: ink, strokeWidth: shape.width ?? strokeWidth, strokeLinecap: 'round', strokeLinejoin: 'round',
-        pathLength: 1, strokeDasharray: 1, strokeDashoffset: 1 - clamp(p * 1.15),
+        pathLength: 1, strokeDasharray: '1 1.2', strokeDashoffset: 1.1 * (1 - clamp(p * 1.15)),
       });
     }));
 }

@@ -10,7 +10,7 @@ Write to these from the first line; the design review and the finished-file chec
 - Contrast 3:1 or more for large text, 4.5:1 for small.
 
 **Frame**
-- In a 9:16 video keep text out of the top 8%, the bottom 18% and the right 11%: the platform's buttons cover them.
+- In a 9:16 video keep text out of the top 8%, the bottom 18% and the right 11%: the platform's buttons cover them. For a clip that goes to TikTok, Reels and Shorts at once, check with `--safe-zone strict` (`mr make video.tsx --safe-zone strict`): text stays inside y 288 to 1248 and x 120 to 888 on a 1080 x 1920 frame, narrowing to x 780 below y 840 where the action rail widens.
 - Use the room: a picture that fills under half of the usable height in most frames is noted as empty.
 - Nothing runs off the frame or is clipped by its container.
 - Frame 0 is the thumbnail in many feeds and players: have the hero (title, picture or number) already in view on the first frame, and let the motion start from there. A first frame that is only the background is noted.
@@ -21,6 +21,7 @@ Write to these from the first line; the design review and the finished-file chec
 **Motion**
 - Nothing may stay still for long: about 4 s (6 s on a closing hold) of an unchanged picture is flagged.
 - Text that types or animates letter by letter reads as flashing text.
+- A line that draws on (`strokeDashoffset`) with a round cap needs a gap longer than the path (`strokeDasharray="1 1.2"`, offset `1.1 * (1 - draw)` on `pathLength={1}`), or the cap can paint a dot where it starts: the review warns `svg-round-cap-dot`.
 
 **Sound**
 - Set `export.loudness` in `config` (-16, or -14 for vertical social video).

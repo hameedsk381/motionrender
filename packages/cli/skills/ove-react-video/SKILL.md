@@ -232,7 +232,7 @@ A video about a topic must not come out as headline, cards and a button. Decide 
 3. **Set the pace from the beats of the story**, not a fixed scene count: a short idea is ten seconds, not thirty.
 4. **Check it does not look like your last video.** If the page structure repeats, start the layout again before you adjust any colour.
 
-The shape of a chart-as-page, for a falling cost (9:16): a headline of two lines at the top, an `<svg>` the width of the frame whose `path` draws on with `pathLength={1}`, `strokeDasharray={1}` and `strokeDashoffset={1 - draw}` (`draw` from `springValue`), pins that pop in when the line reaches them, then the number counting up with `NumberTicker`. Keep pin labels clear of the line, and keep all text out of the safe-zone bands.
+The shape of a chart-as-page, for a falling cost (9:16): a headline of two lines at the top, an `<svg>` the width of the frame whose `path` draws on with `pathLength={1}`, `strokeDasharray="1 1.2"` and `strokeDashoffset={1.1 * (1 - draw)}` (a gap longer than the path, or a round cap paints a dot at the start) (`draw` from `springValue`), pins that pop in when the line reaches them, then the number counting up with `NumberTicker`. Keep pin labels clear of the line, and keep all text out of the safe-zone bands.
 
 ### Pictures for the scenes
 

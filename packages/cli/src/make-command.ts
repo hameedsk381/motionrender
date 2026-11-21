@@ -5,15 +5,17 @@ const option = (argv: string[], name: string) => { const index = argv.indexOf(na
 
 export async function runMake(argv: string[]): Promise<void> {
   const file = argv[1];
-  if (!file || file.startsWith('--')) throw new Error('Usage: mr make <video.tsx|explainer.json|composition.json> [--draft|--final] [--no-voice] [--no-react] [--voice <name>] [--output file.mp4] [--sheet review.png] [--every N] [--allow-code] [--json]');
+  if (!file || file.startsWith('--')) throw new Error('Usage: mr make <video.tsx|explainer.json|composition.json> [--draft|--final] [--no-voice] [--no-react] [--voice <name>] [--output file.mp4] [--sheet review.png] [--every N] [--safe-zone social|strict] [--allow-code] [--json]');
   if (argv.includes('--draft') && argv.includes('--final')) throw new Error('Choose --draft or --final, not both');
   const render: MakeRender | undefined = argv.includes('--final') ? 'final' : argv.includes('--draft') ? 'draft' : undefined;
   const every = option(argv, '--every') === undefined ? undefined : Number(option(argv, '--every'));
   if (every !== undefined && !(Number.isInteger(every) && every > 0)) throw new Error('--every must be a whole number of frames');
+  const safeZone = option(argv, '--safe-zone');
+  if (safeZone !== undefined && safeZone !== 'social' && safeZone !== 'strict') throw new Error('--safe-zone must be social or strict');
   const asJson = argv.includes('--json');
   const result = await makeVideo({
     file, render, output: option(argv, '--output'), sheet: option(argv, '--sheet'), voice: !argv.includes('--no-voice'), voiceName: option(argv, '--voice'),
-    allowCode: argv.includes('--allow-code'), react: !argv.includes('--no-react'), every, log: asJson ? undefined : message => console.error(`  ${message}`),
+    allowCode: argv.includes('--allow-code'), safeZone: safeZone as 'social' | 'strict' | undefined, react: !argv.includes('--no-react'), every, log: asJson ? undefined : message => console.error(`  ${message}`),
   });
   console.log(asJson ? JSON.stringify(result, null, 2) : makeReport(result));
   if (!result.ok) process.exitCode = 1;

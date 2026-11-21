@@ -25,8 +25,9 @@ describe('illustrations', () => {
 
   it('draws itself on from its delay: nothing before it, the outline then the colour after', () => {
     const before = at(0, createElement(Illustration, { name: 'server', delay: 30 })), later = at(60, createElement(Illustration, { name: 'server', delay: 30 }));
-    expect(before).toMatch(/stroke-dashoffset="1"/);
-    expect(later).not.toMatch(/stroke-dashoffset="1"/);
+    expect(before).toMatch(/stroke-dashoffset="1\.1"/);
+    expect(before).toMatch(/stroke-dasharray="1 1\.2"/);
+    expect(later).not.toMatch(/stroke-dashoffset="1\.1"/);
     expect(at(0, createElement(Illustration, { name: 'server', delay: 30, drawn: true }))).toMatch(/stroke-dashoffset="0"/);
   });
 

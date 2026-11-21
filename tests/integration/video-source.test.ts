@@ -141,3 +141,30 @@ export default function Video() { const f = useCurrentFrame(); const t = { posit
     expect(makeReport(await makeVideo({ file: source, every: 30 }))).toMatch(/Motion assertions not used: motion assertion 1: appearsBy needs either "seconds" or "frame"/);
   }, 240_000);
 });
+
+// Two checks learned from HyperFrames: a hidden round-capped stroke can still paint a dot, and `strict` keeps text clear of TikTok, Reels and Shorts together.
+describe('make: the dot lint and the strict safe zone', () => {
+  const film = (body: string) => `import { AbsoluteFill } from 'motionrender/react';
+export const config = { id: 'dots', width: 540, height: 960, fps: 30, durationInFrames: 60, background: '#f4efe4', export: { loudness: -16 } };
+export default function Video() { return <AbsoluteFill style={{ fontFamily: 'Inter, sans-serif', color: '#1b1b1b' }}>${body}</AbsoluteFill>; }
+`;
+  const project = async (name: string, body: string) => { const root = join(dir, name); await mkdir(root, { recursive: true }); await writeFile(join(root, 'video.tsx'), film(body)); return join(root, 'video.tsx'); };
+  const stroke = (dash: string, offset: string) => `<svg width={540} height={400} style={{ position: 'absolute', left: 0, top: 200 }}><path d="M40 40 L300 300" fill="none" stroke="#1b1b1b" strokeWidth={10} strokeLinecap="round" pathLength={1} strokeDasharray=${dash} strokeDashoffset=${offset} /></svg><div style={{ position: 'absolute', left: 40, top: 120, fontSize: 56, fontWeight: 700, lineHeight: 1.2 }}>A title in view</div>`;
+
+  it('warns about a hidden round-capped stroke whose gap is only as long as the path', async () => {
+    const result = await makeVideo({ file: await project('dot', stroke('{1}', '{1}')), every: 30 });
+    expect(makeReport(result)).toMatch(/warn .*The stroke path is hidden with a dash as long as its path.*round cap can still paint a dot/);
+  }, 240_000);
+
+  it('is quiet when the gap is longer than the path', async () => {
+    const result = await makeVideo({ file: await project('nodot', stroke('"1 1.2"', '{1.1}')), every: 30 });
+    expect(makeReport(result)).not.toMatch(/round cap can still paint a dot/);
+  }, 240_000);
+
+  it('strict keeps text out of the lower 35% of a vertical frame, where social allows it', async () => {
+    const low = `<div style={{ position: 'absolute', left: 40, top: 660, fontSize: 56, fontWeight: 700, lineHeight: 1.2 }}>Low caption text</div>`;
+    const file = await project('zone', low);
+    expect(makeReport(await makeVideo({ file, every: 30 }))).not.toMatch(/bottom UI band/);
+    expect(makeReport(await makeVideo({ file, every: 30, safeZone: 'strict' }))).toMatch(/bottom UI band/);
+  }, 480_000);
+});

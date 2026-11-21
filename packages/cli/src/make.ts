@@ -14,6 +14,7 @@ import { loadMotionAssertions, motionFileFor } from './motion-file';
 export type MakeRender = 'draft' | 'final';
 export type MakeOptions = {
   /** An explainer script, semantic video plan, or composition. */ file: string;
+  /** Which platform controls the review keeps text clear of: social (default) or strict (TikTok, Reels and Shorts together). */ safeZone?: 'social' | 'strict';
   /** Render an MP4 after the checks: a quick draft (half size, fast encode) or the full-quality video. Default: no render. */ render?: MakeRender;
   /** The video file (default: draft.mp4 or out.mp4 beside the input). */ output?: string;
   /** Contact sheet path (default: review.png beside the input). */ sheet?: string;
@@ -101,7 +102,7 @@ export async function makeVideo(options: MakeOptions): Promise<MakeResult> {
   log('Checking the design and drawing the contact sheet…');
   const motion = await loadMotionAssertions(file).catch((error: Error) => { notes.push(`Motion assertions not used: ${error.message}`); return undefined; });
   if (motion?.length) notes.push(`Checking ${motion.length} motion assertion${motion.length === 1 ? '' : 's'} from ${motionFileFor(file).split(/[\\/]/).pop()}.`);
-  const reviewed = await reviewComposition(composition, { baseDir, allowCode, every: options.every, motion });
+  const reviewed = await reviewComposition(composition, { baseDir, allowCode, every: options.every, motion, safeZonePreset: options.safeZone });
   const sheet = resolve(options.sheet ?? join(baseDir, 'review.png'));
   await writeFile(sheet, reviewed.sheet);
   timings.review = seconds(started);

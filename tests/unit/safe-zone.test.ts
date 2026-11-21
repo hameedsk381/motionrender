@@ -51,3 +51,34 @@ describe('the prompts state the bands the review enforces', () => {
     expect(systemPrompt()).toContain('listed for this canvas in the task message');
   });
 });
+
+// `social` keeps clear of one platform's usual controls; `strict` keeps clear of TikTok, Reels and Shorts together: on 1080 x 1920, y 288 to 1248 and x 120 to 888, narrowing to x 780 below y 840.
+describe('safe zone presets', () => {
+  const edges = (bands: ReturnType<typeof safeZoneBands>) => Object.fromEntries(bands.map(b => [b.name, b]));
+
+  it('keeps the usual social bands by default', () => {
+    const b = edges(safeZoneBands(1080, 1920));
+    expect(Math.round(b['top UI band']!.y1)).toBe(154);
+    expect(Math.round(b['bottom UI band']!.y0)).toBe(1574);
+    expect(Math.round(b['right UI band']!.x0)).toBe(961);
+    expect(b['action rail']).toBeUndefined();
+  });
+
+  it('strict leaves y 288 to 1248 and x 120 to 888, and narrows to x 780 below y 840', () => {
+    const b = edges(safeZoneBands(1080, 1920, undefined, 'strict'));
+    expect(Math.round(b['top UI band']!.y1)).toBe(288);
+    expect(Math.round(b['bottom UI band']!.y0)).toBe(1248);
+    expect(Math.round(b['left UI band']!.x1)).toBe(120);
+    expect(Math.round(b['right UI band']!.x0)).toBe(888);
+    expect(Math.round(b['action rail']!.x0)).toBe(780);
+    expect(Math.round(b['action rail']!.y0)).toBe(840);
+    expect(b['action rail']!.hint).toMatch(/below y 840.*left of x 780/);
+  });
+
+  it('strict scales with the frame and does nothing to a landscape one', () => {
+    const half = edges(safeZoneBands(540, 960, undefined, 'strict'));
+    expect(Math.round(half['top UI band']!.y1)).toBe(144);
+    expect(Math.round(half['action rail']!.x0)).toBe(390);
+    expect(safeZoneBands(1920, 1080, undefined, 'strict')).toEqual(safeZoneBands(1920, 1080));
+  });
+});

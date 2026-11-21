@@ -48,7 +48,7 @@ Commands:
   mr explainer kinds [--json] | looks [--json] | example [--output explainer.json]   what each scene kind shows, with a valid example (no AI needed to write a script)
   mr explainer validate|compile <explainer.json> [--output composition.json] [--no-voice] [--voice <name>]   an explainer script (scenes + spoken lines) into a video
   mr still <composition.json> [--frame 0] [--output still.png] [--transparent] [variables]
-  mr review <composition.json> [--output review.png] [--target social|web] [--every 15] [--motion video.motion.json] [--sheet-frames 20] [--json] [variables]   contact sheet and design checks
+  mr review <composition.json> [--output review.png] [--target social|web] [--safe-zone social|strict] [--every 15] [--motion video.motion.json] [--sheet-frames 20] [--json] [variables]   contact sheet and design checks
   mr plan direct "brief" --react [--format 9:16] [--output explainer.json]
   mr review <composition.json> --clips-dir checkpoints [--allow-code]
   mr soundtrack video.mp4 --audio revised.wav --output revised.mp4
@@ -278,10 +278,11 @@ Press Ctrl+C to stop.`);
         console.log(`Created ${output}`);
       }
       else if (command === 'review') { const output=resolve(option('--output') ?? 'review.png'), every=option('--every') === undefined ? undefined : Number(option('--every')), sheetOption=option('--sheet-frames') ?? option('--frames'), sheetFrames=sheetOption === undefined ? undefined : Number(sheetOption);
-        const target = option('--target');
+        const target = option('--target'), safeZonePreset = option('--safe-zone');
+        if (safeZonePreset !== undefined && safeZonePreset !== 'social' && safeZonePreset !== 'strict') throw new Error('--safe-zone must be social or strict');
         if (target !== undefined && target !== 'social' && target !== 'web') throw new Error('--target must be social or web');
         if (every !== undefined && !(Number.isInteger(every) && every > 0)) throw new Error('--every must be a whole number of frames'); if (sheetFrames !== undefined && !(Number.isInteger(sheetFrames) && sheetFrames > 0 && sheetFrames <= 60)) throw new Error('--sheet-frames must be from 1 to 60');
-        const motion=await (await import('./motion-file')).loadMotionAssertions(file!, option('--motion')); const result=await reviewComposition(composition, { baseDir, allowCode: flag('--allow-code'), target, every, sheetFrames, showSafeZones: flag('--show-safe-zones'), motion, onProgress: (done, total) => { if (!flag('--json') && (done === total || done % 10 === 0)) process.stderr.write(`Checked ${done}/${total} frames\r`); } }); await writeFile(output, result.sheet);
+        const motion=await (await import('./motion-file')).loadMotionAssertions(file!, option('--motion')); const result=await reviewComposition(composition, { baseDir, allowCode: flag('--allow-code'), target, every, sheetFrames, showSafeZones: flag('--show-safe-zones'), motion, safeZonePreset, onProgress: (done, total) => { if (!flag('--json') && (done === total || done % 10 === 0)) process.stderr.write(`Checked ${done}/${total} frames\r`); } }); await writeFile(output, result.sheet);
         const clips: { scene: string; output: string }[] = [];
         const clipsDir = option('--clips-dir');
         if (clipsDir) {

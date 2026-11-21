@@ -144,7 +144,7 @@ function chart(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement 
     const path = xs.map((x, i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${ys[i]!.toFixed(1)}`).join(' '), drawn = sp(ctx, 6), length = xs.reduce((sum, x, i) => (i ? sum + Math.hypot(x - xs[i - 1]!, ys[i]! - ys[i - 1]!) : 0), 0);
     return stack(ctx, [h('svg', { key: 'svg', width: w, height: hgt + 60, viewBox: `0 0 ${w} ${hgt + 60}`, style: { alignSelf: 'center', overflow: 'visible' } },
       h('line', { x1: 0, y1: hgt - 20, x2: w, y2: hgt - 20, stroke: col(ctx, 'muted'), strokeOpacity: 0.5, strokeWidth: 3 }),
-      h('path', { d: path, fill: 'none', stroke: col(ctx, 'accent2'), strokeWidth: 8, strokeLinecap: 'round', strokeLinejoin: 'round', strokeDasharray: length, strokeDashoffset: length * (1 - drawn) }),
+      h('path', { d: path, fill: 'none', stroke: col(ctx, 'accent2'), strokeWidth: 8, strokeLinecap: 'round', strokeLinejoin: 'round', strokeDasharray: `${length} ${length * 1.2}`, strokeDashoffset: length * 1.1 * (1 - drawn) }),
       ...items.map((item, i) => { const shown = drawn >= i / Math.max(1, n - 1) - 0.001, r = i === top ? 16 + 4 * Math.sin(ctx.frame / 9) : 10; return h('g', { key: i, opacity: shown ? 1 : 0 },
         i === top && drawn >= 1 ? h('circle', { cx: xs[i], cy: ys[i], r: 20 + ((ctx.frame % 45) / 45) * 50, fill: 'none', stroke: tone(i), strokeWidth: 4, opacity: 1 - (ctx.frame % 45) / 45 }) : null,
         h('circle', { cx: xs[i], cy: ys[i], r, fill: tone(i) }),
@@ -289,7 +289,7 @@ function stat(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement {
     const r = 250, c = 2 * Math.PI * r, frac = (Number.isFinite(numeric) ? numeric : 0) / 100;
     return stack(ctx, [h('div', { key: 'ring', style: { alignSelf: 'center', position: 'relative', width: 600, height: 600 } },
       h('svg', { width: 600, height: 600, viewBox: '0 0 600 600' }, h('circle', { cx: 300, cy: 300, r, fill: 'none', stroke: col(ctx, 'surface'), strokeWidth: 44 }),
-        h('circle', { cx: 300, cy: 300, r, fill: 'none', stroke: tone, strokeWidth: 44, strokeLinecap: 'round', strokeDasharray: c, strokeDashoffset: c * (1 - frac * p), transform: 'rotate(-90 300 300)' })),
+        h('circle', { cx: 300, cy: 300, r, fill: 'none', stroke: tone, strokeWidth: 44, strokeLinecap: 'round', strokeDasharray: `${c} ${c * 1.2}`, strokeDashoffset: c * 1.1 * (1 - frac * p), transform: 'rotate(-90 300 300)' })),
       h('div', { style: box({ left: 0, top: 0, width: 600, height: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', ...display(ctx, 900), fontSize: 150, color: tone }) }, shown)), label, note], 30);
   }
   if (pick === 'stacked') return stack(ctx, [h('div', { key: 'v', style: { ...display(ctx, 900), fontSize: 120, lineHeight: 1.05, color: tone, textAlign: 'left', ...arrive(ctx, 4, 26) } }, shown), h('div', { key: 'rule', style: { height: 6, width: 220 * sp(ctx, 16), background: tone, borderRadius: 3 } }),

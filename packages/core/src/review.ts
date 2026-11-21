@@ -9,7 +9,7 @@ export type ReviewResult = { checkpoints?: (Storyboard & { scene: string; frame:
 export type ReviewRepairTask = { id: string; severity: ReviewIssue['severity']; target: { sceneId?: string; beatId?: string; layer?: string; frame?: number }; category: 'layout' | 'copy' | 'motion' | 'audio' | 'continuity' | 'style'; instruction: string; issues: ReviewIssue[] };
 export type SafeZone = { top?: number; bottom?: number; left?: number; right?: number };
 export type ReviewTarget = 'social' | 'web';
-export type ReviewOptions = { allowCode?: boolean; baseDir?: string; every?: number; sheetFrames?: number; columns?: number; concurrency?: number; audio?: boolean; target?: ReviewTarget; safeZone?: SafeZone; showSafeZones?: boolean; /** Requirements about the motion (from a video.motion.json), judged on the real frames. */ motion?: MotionAssertion[]; onProgress?: (done: number, total: number) => void };
+export type ReviewOptions = { allowCode?: boolean; baseDir?: string; every?: number; sheetFrames?: number; columns?: number; concurrency?: number; audio?: boolean; target?: ReviewTarget; safeZone?: SafeZone; showSafeZones?: boolean; /** `strict` keeps text clear of TikTok, Reels and Shorts at once (default `social`). */ safeZonePreset?: SafeZonePreset; /** Requirements about the motion (from a video.motion.json), judged on the real frames. */ motion?: MotionAssertion[]; onProgress?: (done: number, total: number) => void };
 
 const area = (a: TextNote) => Math.max(0, a.x1 - a.x0) * Math.max(0, a.y1 - a.y0);
 type Rect = { x0: number; y0: number; x1: number; y1: number };
@@ -26,15 +26,19 @@ export type SafeZoneBand = { name: string; hint: string; x0: number; y0: number;
  * actually overlaps the video, and bands that land on the letterbox drop out. Insets are fractions of the frame; callers
  * can override any of them (0 turns a band off). A landscape canvas has no app chrome, so there are no bands by default.
  */
-export function safeZoneBands(width: number, height: number, override?: SafeZone): SafeZoneBand[] {
+/** `social` keeps clear of one platform's usual controls; `strict` keeps clear of all of TikTok, Reels and Shorts at once: a 1080 x 1920 frame leaves y 288 to 1248 and x 120 to 888, and below y 840 x 780, where the action rail widens. */
+export type SafeZonePreset = 'social' | 'strict';
+export function safeZoneBands(width: number, height: number, override?: SafeZone, preset: SafeZonePreset = 'social'): SafeZoneBand[] {
   const screen = width * 16 / 9, letterbox = height >= width ? Math.max(0, (screen - height) / 2) : 0;
-  const inset = { ...(height >= width
+  const strict = preset === 'strict' && height >= width;
+  const inset = { ...(strict ? { top: 0.15, bottom: 0.35, left: 0.111, right: 0.178 } : height >= width
     ? { top: Math.max(0, 0.08 * screen - letterbox) / height, bottom: Math.max(0, 0.18 * screen - letterbox) / height, left: 0.02, right: 0.11 }
     : {}), ...override };
   const bands: SafeZoneBand[] = [];
   if (inset.bottom) bands.push({ name: 'bottom UI band', hint: `Reels and TikTok draw their controls over the bottom ${Math.round(inset.bottom * height)} px: keep text above y ${Math.round(height - inset.bottom * height)}`, x0: 0, y0: height - inset.bottom * height, x1: width, y1: height });
   if (inset.right) bands.push({ name: 'right UI band', hint: `the action buttons cover the right ${Math.round(inset.right * width)} px: keep text left of x ${Math.round(width - inset.right * width)}`, x0: width - inset.right * width, y0: 0, x1: width, y1: height });
   if (inset.top) bands.push({ name: 'top UI band', hint: `search and the camera cover the top ${Math.round(inset.top * height)} px: keep text below y ${Math.round(inset.top * height)}`, x0: 0, y0: 0, x1: width, y1: inset.top * height });
+  if (strict) bands.push({ name: 'action rail', hint: `below y ${Math.round(0.4375 * height)} the action rail widens: keep text left of x ${Math.round(width * 0.7222)}`, x0: width * 0.7222, y0: 0.4375 * height, x1: width, y1: height });
   if (inset.left) bands.push({ name: 'left UI band', hint: `keep text right of x ${Math.round(inset.left * width)}`, x0: 0, y0: 0, x1: inset.left * width, y1: height });
   return bands;
 }
@@ -91,7 +95,7 @@ export async function reviewComposition(composition: Composition, options: Revie
   frames.sort((a, b) => a - b);
   sheetFrames.sort((a, b) => a - b);
   const web = options.target === 'web';
-  const bands=safeZoneBands(width, height, web ? { top: 0, bottom: 0, left: 0, right: 0, ...options.safeZone } : options.safeZone);
+  const bands=safeZoneBands(width, height, web ? { top: 0, bottom: 0, left: 0, right: 0, ...options.safeZone } : options.safeZone, options.safeZonePreset);
   const safeBands = options.showSafeZones ? bands.map(b => ({ x0: b.x0 / width, y0: b.y0 / height, x1: b.x1 / width, y1: b.y1 / height })) : undefined;
   const renderer=await createRenderer(composition, { baseDir, concurrency: options.concurrency ?? defaultConcurrency(), scale: Math.min(1, 1280/Math.max(width, height)), allowCode: options.allowCode });
   let reports: FrameReport[]=[], sheet: Buffer, firstFrame: FrameReport | undefined; try { let done=0; reports=await Promise.all(frames.map(f => renderer.inspectFrame(f).then(r => { options.onProgress?.(++done, frames.length); return r; })));
@@ -101,7 +105,10 @@ export async function reviewComposition(composition: Composition, options: Revie
   // A picture that did not load renders as nothing and the picture is simply missing from the video: say so, once per picture, then keep these notes out of the text checks.
   const missingPictures = new Set<string>();
   reports.forEach((report, i) => { for (const t of report.texts) if (t.kind === 'image' && t.broken && !missingPictures.has(t.text)) { missingPictures.add(t.text); issues.push({ severity: 'error', code: 'image-missing', message: `The picture "${t.text}" did not load, so it renders as nothing: declare it in config.assets and use it by its id (mr stock prints the entry), or fix its path`, frame: frames[i]!, layer: t.id }); } });
-  reports = reports.map(report => ({ ...report, texts: report.texts.filter(t => t.kind !== 'image') }));
+  const dots = new Set<string>();
+  reports.forEach((report, i) => { for (const t of report.texts) if (t.kind === 'finding' && t.code === 'svg-round-cap-dot') { const [name, dash] = t.text.split('|'); if (dots.has(name!)) continue; dots.add(name!);
+    issues.push({ severity: 'warning', code: 'svg-round-cap-dot', message: `The stroke ${name} is hidden with a dash as long as its path (stroke-dasharray ${dash}, offset ${dash}) but its round cap can still paint a dot where it starts: give the gap more room (stroke-dasharray "1 1.2" with stroke-dashoffset 1.1 on pathLength 1, then 1.1 * (1 - draw)), or use a butt cap until it starts`, frame: frames[i]!, layer: t.id }); } });
+  reports = reports.map(report => ({ ...report, texts: report.texts.filter(t => t.kind !== 'image' && t.kind !== 'finding') }));
   // Problems that last: a layer reported once per kind, at the first sampled frame, and only when it holds for at least `hold` samples
   // in a row (so things sliding in from off-frame, or crossing during a transition, are not flagged).
   const persistent=(code: string, hold: number, test: (t: TextNote, report: FrameReport) => string | undefined, severity: ReviewIssue['severity']) => { const runs=new Map<string, { start: number; count: number; message: string }>(), reported=new Set<string>();
