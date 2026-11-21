@@ -108,7 +108,7 @@ describe('the React explainer build', () => {
   it('knows which variants each React scene offers', () => {
     expect(explainerVariants.compare).toEqual(['split', 'stacked', 'versus', 'halves']);
     expect(Object.keys(explainerVariants).sort()).toEqual([...REACT_KINDS].sort());
-    expect(explainerVariants.stat).toEqual(['hero', 'ring', 'stacked']);
+    expect(explainerVariants.stat).toEqual(['hero', 'ring', 'stacked', 'bleed']);
     expect(explainerVariants.phone).toEqual(['handset', 'thread']);
     expect(explainerVariants.media).toEqual(['frame', 'split', 'browser']);
     expect(explainerVariants.steps).toContain('bento');
