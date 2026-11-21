@@ -22,9 +22,9 @@ describe('explainer chrome', () => {
   });
 
   it('draws the progress by look, and a script can override it', () => {
-    expect(ids('navy').scene.filter(id => id.startsWith('chapter-')).length).toBeGreaterThan(3);
+    expect(ids('navy').scene.filter((id: string) => id.startsWith('chapter-')).length).toBeGreaterThan(3);
     expect(ids('ink').scene).toContain('chapter-track');
-    expect(ids('terminal').scene.filter(id => id.startsWith('chapter')).sort()).toEqual(['chapter-count']);
+    expect(ids('terminal').scene.filter((id: string) => id.startsWith('chapter')).sort()).toEqual(['chapter-count']);
     expect(ids('navy', { progress: 'line' }).scene).toContain('chapter-track');
   });
 });

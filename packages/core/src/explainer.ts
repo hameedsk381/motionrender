@@ -1,6 +1,7 @@
 // Turns an explainer script (the scenes and what is said over them) into a composition. Each scene kind draws one kind of small animated
 // diagram on the same dark board, with the same header and footer on every scene, so any topic gets a consistent video. Nothing here
 // runs while rendering: the result is plain composition JSON, frame-exact like any other.
+import { directScenes } from './explainer-direction';
 import { foldLayers, foldClosed } from './fold-layers';
 import { splitLayers, splitArrival } from './split-layers';
 import { routeLayers } from './route-layers';
@@ -553,7 +554,8 @@ function reactCues(scene: ExplainerScene, frames: number): Layer[] {
  * Compiles an explainer script into a composition. A scene with a spoken line lasts as long as the line (plus a short pause), never
  * shorter than its pictures need; `audio[i]` is the recording of scene i's `say`, if there is one.
  */
-export function compileExplainer(spec: Explainer, options: CompileOptions = {}): ExplainerCompiled {
+export function compileExplainer(input: Explainer, options: CompileOptions = {}): ExplainerCompiled {
+  const spec: Explainer = { ...input, scenes: directScenes(input) };
   // The look is a whole design; the script's `design` and `colors` change parts of it.
   const def = explainerLookDefs[spec.look];
   const chosen = { ...def.design, ...Object.fromEntries(Object.entries(spec.design ?? {}).filter(([, value]) => value !== undefined)) } as typeof def.design;
@@ -641,6 +643,9 @@ function compileWith(spec: Explainer, options: CompileOptions, palette: Record<s
   const reactScenes: ExplainerReactScene[] = [];
   const reactable = options.reactKinds ?? [];
   const audio = spec.silent ? undefined : options.audio;
+  // How a scene arrives follows what it is (a number zooms in, a contrast pushes, a sequence wipes) unless the script chose one transition for the whole video.
+  const lookTransition = String(palette.transition), KIND_TRANSITION: Record<string, string> = { stat: 'zoom', compare: 'push', chart: 'wipe', timeline: 'wipe', flow: 'push', route: 'zoom' };
+  const transitionFor = (kind: string) => (spec.design?.transition ? '{{transition}}' : KIND_TRANSITION[kind] && KIND_TRANSITION[kind] !== lookTransition ? KIND_TRANSITION[kind]! : '{{transition}}');
   const [cw, ch] = SIZES[spec.aspect], fit = Math.min(cw / W, ch / H), column = cw !== W || ch !== H;
   const scenes = spec.scenes.map((scene, i) => {
     // A scene may pick its own layout (card or editorial), so a video is not one template from start to end.
@@ -652,7 +657,7 @@ function compileWith(spec: Explainer, options: CompileOptions, palette: Record<s
       reactScenes.push({ sceneId: id, index: i, scene, frames, captions: !!cues });
       return { id, name: `${i + 1}. ${scene.kind} (react)`, durationFrames: frames, metadata: { storyboard: sceneBoard(scene, frames) },
         ...(column ? { camera: { x: W / 2, y: H / 2, zoom: fit } } : {}),
-        ...(i > 0 ? { transitionIn: { type: '{{transition}}', durationFrames: 14 } } : {}),
+        ...(i > 0 ? { transitionIn: { type: transitionFor(scene.kind), durationFrames: 14 } } : {}),
         layers: [...(['fold', 'split', 'route'].includes(scene.kind) ? (kinds[scene.kind] as Kind<any>)(scene, i).layers(frames) : []), ...(cues && sentence ? [captionNote(sentence, frames)] : []),
           ...(spec.chapters ? chapterBar(i, spec.scenes.length, frames) : []), ...(cues ? [captionsLayer(cues)] : []),
           ...(spoken ? [{ id: 'voice', type: 'audio', src: spoken.src, startFrame: 8, volume: 1 }] : []), ...reactCues(scene, frames)] };
@@ -674,7 +679,7 @@ function compileWith(spec: Explainer, options: CompileOptions, palette: Record<s
     const picture = scene.place === 'top' || scene.kind === 'pile' || scene.kind === 'media' || scene.kind === 'freeform' ? drawn : centred(drawn, cues ? CAPTIONS_Y - (note.length ? 130 : 40) : BAND.bottom);
     return { id: `s${i + 1}-${scene.kind}`, name: `${i + 1}. ${scene.kind}`, durationFrames: frames, metadata: { storyboard: sceneBoard(scene, frames) },
       ...(column ? { camera: { x: W / 2, y: H / 2, zoom: fit } } : {}),
-      ...(i > 0 ? { transitionIn: { type: '{{transition}}', durationFrames: 14 } } : {}),
+      ...(i > 0 ? { transitionIn: { type: transitionFor(scene.kind), durationFrames: 14 } } : {}),
       layers: [...picture, ...note, ...(spec.chapters ? chapterBar(i, spec.scenes.length, frames) : []), ...(cues ? [captionsLayer(cues)] : []),
         ...(spoken ? [{ id: 'voice', type: 'audio', src: spoken.src, startFrame: 8, volume: 1 }] : [])] };
   });
