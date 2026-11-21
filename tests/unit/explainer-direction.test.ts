@@ -12,6 +12,16 @@ describe('explainer direction', () => {
     expect(suitableVariants(script('T', [{ kind: 'stat', value: '1.46 billion', label: 'people' }]).scenes[0]!)).toEqual(['stacked']);
   });
 
+  it('offers the full-bleed drawings only where the content fits them', () => {
+    const one = (scene: object) => suitableVariants(script('T', [scene]).scenes[0]!);
+    expect(one({ kind: 'stat', value: '95%', label: 'of loads' })).toContain('bleed');
+    expect(one({ kind: 'stat', value: '1.46 billion', label: 'people' })).not.toContain('bleed');
+    expect(one({ kind: 'title', brand: 'TLS', lines: ['A', 'B', 'C'] })).toContain('bleed');
+    expect(one({ kind: 'title', lines: ['How does the whole internet', 'MANAGE TO NAME EVERYTHING', 'at once?'] })).not.toContain('bleed');
+    expect(one({ kind: 'compare', left: { title: 'HTTP', points: ['Readable'] }, right: { title: 'HTTPS', points: ['Private'] } })).toContain('halves');
+    expect(one({ kind: 'quote', text: 'x'.repeat(130), source: 'S' })).toEqual(['pull']);
+  });
+
   it('is deterministic, keeps a scene\'s own variant, and varies with the topic', () => {
     const scenes = [steps(3), { ...steps(3), variant: 'bento' }, { kind: 'quote', text: 'A short line.', source: 'Someone' }];
     const a = directScenes(script('How DNS works', scenes)), b = directScenes(script('How DNS works', scenes));

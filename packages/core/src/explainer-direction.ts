@@ -10,11 +10,16 @@ const longest = (items: string[]) => Math.max(0, ...items.map(item => item.lengt
 export function suitableVariants(scene: ExplainerScene): string[] {
   const s = scene as any;
   switch (scene.kind) {
-    case 'title': return s.lines.length >= 3 || longest(s.lines) > 22 ? ['poster'] : ['poster', 'centred'];
+    case 'title': {
+      const head = s.brand ? String(s.brand) : String(s.lines[typeof s.highlight === 'number' ? s.highlight : s.lines.length === 3 ? 1 : 0]);
+      const base = s.lines.length >= 3 || longest(s.lines) > 22 ? ['poster'] : ['poster', 'centred'];
+      return head.length <= 14 ? [...base, 'bleed'] : base;
+    }
     case 'compare': {
       const sides = [s.left, s.right], points = sides.flatMap((x: any) => x.points as string[]), total = points.length;
       if (longest(points) > 34 || total >= 7) return ['stacked'];
-      return sides.every((x: any) => x.title.length <= 14 && x.points.length <= 2) ? ['split', 'versus'] : ['split'];
+      const calm = longest(points) <= 30 && total <= 6 && sides.every((x: any) => x.points.length <= 3 && x.title.length <= 22);
+      return [...(sides.every((x: any) => x.title.length <= 14 && x.points.length <= 2) ? ['split', 'versus'] : ['split']), ...(calm ? ['halves'] : [])];
     }
     case 'steps': {
       const n = s.items.length, detail = s.items.some((i: any) => i.detail);
@@ -22,9 +27,9 @@ export function suitableVariants(scene: ExplainerScene): string[] {
     }
     case 'stat': {
       const value = String(s.value);
-      return /%/.test(value) ? ['ring', 'hero', 'stacked'].filter(v => v !== 'hero' || value.length <= 4) : value.length <= 4 ? ['hero', 'stacked'] : ['stacked'];
+      return /%/.test(value) ? ['ring', 'hero', 'stacked', 'bleed'].filter(v => v !== 'hero' || value.length <= 4) : value.length <= 4 ? ['hero', 'stacked', 'bleed'] : value.length <= 8 ? ['stacked', 'bleed'] : ['stacked'];
     }
-    case 'quote': return String(s.text).length > 120 ? ['pull'] : ['card', 'pull'];
+    case 'quote': return String(s.text).length > 120 ? ['pull'] : ['card', 'pull', ...(String(s.text).length <= 100 ? ['bleed'] : [])];
     case 'closing': return s.points?.length ? ['takeaway', 'poster'] : ['poster'];
     case 'chart': return s.type === 'line' ? ['line'] : s.items.length >= 6 || longest(s.items.map((i: any) => i.label)) > 9 ? ['rows'] : ['columns', 'rows'];
     case 'timeline': return s.events.length <= 4 && s.events.every((e: any) => e.title.length <= 28 && !e.detail) ? ['zigzag', 'spine'] : ['spine'];

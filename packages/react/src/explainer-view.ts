@@ -52,11 +52,28 @@ const stack = (ctx: Ctx, children: ReactNode, gap = 28, extra: CSSProperties = {
 const sentence = (ctx: Ctx, text?: string) => (text && !ctxCaptions(ctx) ? h('div', { key: 'cap', style: { ...display(ctx, 700), fontSize: 46, lineHeight: 1.25, textAlign: 'center', marginTop: 14, ...arrive(ctx, Math.round(ctx.frames * 0.7)) } }, text) : null);
 const ctxCaptions = (ctx: Ctx) => (ctx as Ctx & { captions?: boolean }).captions === true;
 
+
+/* ---- full-bleed blocks: a band of colour that runs to both edges of the frame, with the content set on it ---- */
+/** A column the full width of the frame (not inset like `stack`), so a band in it bleeds off both sides. */
+const fullStack = (ctx: Ctx, children: ReactNode, gap = 40) => h('div', { style: box({ left: 0, width: W, top: ctx.band.top, height: ctx.band.bottom - ctx.band.top, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap }) }, children);
+/** A band of `fill` across the whole width that wipes in from the left; its text is the board colour, which reads on every look's accent. */
+const bleedBlock = (ctx: Ctx, key: string, fill: string, children: ReactNode, gap = 24, pad = '72px 60px') => h('div', { key, style: { background: fill, color: col(ctx, 'bg'), padding: pad, display: 'flex', flexDirection: 'column', gap, clipPath: `inset(0 ${Math.round((1 - sp(ctx, 2)) * 100)}% 0 0)` } }, children);
+/** Content set back inside the margins, under or over a band. */
+const inset = (key: string, children: ReactNode, gap = 20) => h('div', { key, style: { padding: '0 60px', display: 'flex', flexDirection: 'column', gap } }, children);
+const onBand = (ctx: Ctx, size: number, weight = 900, extra: CSSProperties = {}): CSSProperties => ({ ...display(ctx, weight), color: col(ctx, 'bg'), fontSize: size, lineHeight: 1.1, ...extra });
+
 /* ---- compare: split cards, stacked cards or a versus ---- */
 function compare(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement {
   const sides = [{ ...s.left, tone: RED, mark: '✗', key: 'left' }, { ...s.right, tone: col(ctx, 'accent2'), mark: '✓', key: 'right' }] as { title: string; points: string[]; tone: string; mark: string; key: string }[];
   const long = Math.max(...sides.flatMap(x => x.points.map(p => p.length))), total = sides.reduce((n, x) => n + x.points.length, 0);
   const pick = variant !== 'auto' ? variant : long > 34 || total >= 7 ? 'stacked' : sides.every(x => x.title.length <= 14 && x.points.length <= 2) ? 'versus' : 'split';
+  if (pick === 'halves') {
+    const band = (side: typeof sides[number], i: number) => h('div', { key: side.key, style: { borderLeft: `18px solid ${side.tone}` } }, bleedBlock(ctx, side.key, i === 0 ? col(ctx, 'surface') : side.tone, [
+      h('div', { key: 't', style: { ...onBand(ctx, 66, 900), color: i === 0 ? col(ctx, 'text') : col(ctx, 'bg'), ...arrive(ctx, 4 + i * 30) } }, side.title),
+      ...side.points.map((p, k) => h('div', { key: k, style: { display: 'flex', gap: 18, ...body(ctx, 600), fontSize: 38, lineHeight: 1.25, color: i === 0 ? col(ctx, 'text') : col(ctx, 'bg'), ...arrive(ctx, 14 + i * 30 + k * 12, 18, 24) } },
+        h('span', { style: { fontWeight: 900 } }, side.mark), h('span', null, p)))], 18, '54px 42px'));
+    return fullStack(ctx, [h('div', { key: 'halves', style: { display: 'flex', flexDirection: 'column' } }, band(sides[0]!, 0), band(sides[1]!, 1)), s.caption && !ctxCaptions(ctx) ? inset('cap', sentence(ctx, s.caption)) : null], 36);
+  }
   const point = (side: typeof sides[number], p: string, k: number, at: number, size: number) => h('div', { key: k, style: { display: 'flex', gap: 16, alignItems: 'flex-start', ...arrive(ctx, at + 10 + k * 14, 18, 24) } },
     h('span', { style: { color: side.tone, fontSize: size, lineHeight: 1.2, fontWeight: 800 } }, side.mark), h('span', { style: { ...body(ctx, 500), fontSize: size, lineHeight: 1.25 } }, p));
   if (pick === 'stacked') {
@@ -234,6 +251,12 @@ function stat(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement {
   const shown: ReactNode = parts ? h(NumberTicker, { value: parseFloat(parts[2]!.replace(/,/g, '')), prefix: parts[1], suffix: parts[3], decimals: (parts[2]!.split('.')[1] ?? '').length, delay: 4 }) : value;
   const label = h('div', { key: 'label', style: { ...display(ctx, 700), fontSize: 50, lineHeight: 1.2, textAlign: 'center' } }, h(KineticText, { text: String(s.label), delay: 24, staggerDelay: 2, preset: 'snappy', style: { justifyContent: 'center' } }));
   const note = s.note ? h('div', { key: 'note', style: { ...body(ctx), fontSize: 30, color: col(ctx, 'muted'), textAlign: 'center', ...arrive(ctx, 40) } }, s.note) : null;
+  if (pick === 'bleed') {
+    return fullStack(ctx, [bleedBlock(ctx, 'band', tone, [
+      h('div', { key: 'v', style: { ...onBand(ctx, fitSize(ctx, value, 340, W - 120), 900), lineHeight: 1, letterSpacing: -4, opacity: clamp(p * 3) } }, shown),
+      h('div', { key: 'l', style: { ...onBand(ctx, 54, 700), lineHeight: 1.2, ...arrive(ctx, 18) } }, String(s.label))], 30, '80px 60px'),
+      s.note ? inset('note', h('div', { style: { ...body(ctx), fontSize: 30, color: col(ctx, 'muted'), ...arrive(ctx, 40) } }, s.note)) : null], 36);
+  }
   if (pick === 'ring') {
     const r = 250, c = 2 * Math.PI * r, frac = (Number.isFinite(numeric) ? numeric : 0) / 100;
     return stack(ctx, [h('div', { key: 'ring', style: { alignSelf: 'center', position: 'relative', width: 600, height: 600 } },
@@ -252,6 +275,11 @@ function quote(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement 
   const stampTone = s.stamp ? (s.stamp.tone === 'red' ? RED : s.stamp.tone === 'mint' ? col(ctx, 'accent2') : s.stamp.tone === 'muted' ? col(ctx, 'muted') : col(ctx, 'accent')) : '';
   const stamp = s.stamp ? h(Badge, { key: 'stamp', dot: false, delay: 36, style: { alignSelf: 'flex-start', background: 'transparent', border: `3px solid ${stampTone}`, color: stampTone, ...mono(ctx), fontSize: 24, padding: '6px 16px', borderRadius: radius(ctx, 8), transform: `rotate(-3deg) scale(${sp(ctx, 36, 'bouncy')})` } }, s.stamp.text) : null;
   const who = h('div', { key: 'who', style: { ...arrive(ctx, 30) } }, h('div', { style: { ...display(ctx, 800), fontSize: 38, color: col(ctx, 'accent') } }, '— ' + s.source), s.byline || s.date ? h('div', { style: { ...body(ctx), fontSize: 28, color: col(ctx, 'muted'), marginTop: 4 } }, [s.byline, s.date].filter(Boolean).join(' · ')) : null);
+  if (pick === 'bleed') {
+    return fullStack(ctx, [bleedBlock(ctx, 'band', col(ctx, 'accent'), [
+      h('div', { key: 'm', style: { ...onBand(ctx, 240, 900), lineHeight: 0.7, height: 100, opacity: 0.55 * clamp(sp(ctx, 2) * 2) } }, '“'),
+      h('div', { key: 'q', style: { ...onBand(ctx, 54, 700), lineHeight: 1.25, ...arrive(ctx, 10, 24) } }, String(s.text))], 28, '70px 60px'), inset('who', [stamp, who], 24), s.caption && !ctxCaptions(ctx) ? inset('cap', sentence(ctx, s.caption)) : null], 44);
+  }
   if (pick === 'typed') {
     const text = `“${s.text}”`;
     return stack(ctx, [stamp, h('div', { key: 'q', style: { display: 'flex', gap: 30 } }, h('div', { style: { width: 10, flex: 'none', background: col(ctx, 'accent'), borderRadius: 5 } }),
@@ -276,6 +304,12 @@ function title(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement 
   const lines = s.lines as string[], big = typeof s.highlight === 'number' ? s.highlight : lines.length === 3 ? 1 : 0;
   const pick = variant !== 'auto' ? variant : lines.length >= 3 || lines.some(l => l.length > 22) ? 'poster' : 'centred';
   const align = pick === 'poster' ? 'flex-start' : 'center', ta = pick === 'poster' ? 'left' : 'center';
+  if (pick === 'bleed') {
+    const head = s.brand ? String(s.brand) : lines[big]!, rest = s.brand ? lines : lines.filter((_, k) => k !== big), mark = (line: string) => !!s.brand && line === lines[big];
+    return fullStack(ctx, [bleedBlock(ctx, 'band', col(ctx, 'accent'), [h('div', { key: 'h', style: { ...onBand(ctx, fitSize(ctx, head, 280, W - 120), 900), lineHeight: 1, letterSpacing: -3, ...arrive(ctx, 4, 20, 30) } }, head)], 0, '90px 60px'),
+      inset('rest', [s.chip ? h(Badge, { key: 'chip', dot: false, delay: 10, style: { alignSelf: 'flex-start', background: 'transparent', border: `3px solid ${col(ctx, 'accent')}`, color: col(ctx, 'accent'), ...mono(ctx), fontSize: 24, padding: '8px 20px', borderRadius: radius(ctx, 10) } }, s.chip) : null,
+        ...rest.map((line, k) => h('div', { key: k, style: { ...display(ctx, mark(line) ? 900 : 700), fontSize: mark(line) ? fitSize(ctx, line, 88, W - 120) : 54, lineHeight: 1.15, color: mark(line) ? col(ctx, 'accent') : col(ctx, 'text'), ...arrive(ctx, 16 + k * 10) } }, line))], 16)], 44);
+  }
   return stack(ctx, [
     s.brand ? h('div', { key: 'brand', style: { ...display(ctx, 900), fontSize: pick === 'poster' ? 150 : 120, lineHeight: 1, alignSelf: align, textAlign: ta, ...arrive(ctx, 2, 26) } }, s.brand) : null,
     s.chip ? h(Badge, { key: 'chip', dot: false, delay: 10, style: { alignSelf: align, background: 'transparent', border: `3px solid ${col(ctx, 'accent')}`, color: col(ctx, 'accent'), ...mono(ctx), fontSize: 24, padding: '8px 20px', borderRadius: radius(ctx, 10) } }, s.chip) : null,
