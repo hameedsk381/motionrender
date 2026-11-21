@@ -3,7 +3,7 @@
 // CompositionView and the React scenes beside it. A scene kind can have several drawings (variants): the script names one, or the scene's own
 // content picks (a long point wants a stacked card, a short pair wants a versus, many bars want rows), so a video is not one template.
 // Every value is a pure function of the frame, like any other video component.
-import { createElement as h, type CSSProperties, type ReactElement, type ReactNode } from 'react';
+import { createElement as h, useLayoutEffect, useRef, useState, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 import { useCurrentFrame, Video } from './index';
 import { AmbientGlow, Badge, BentoCard, BentoGrid, DeviceFrame, GlassCard, KineticText, NumberTicker, ProgressBar, Typewriter, Waveform } from './components';
 import { springValue, type SpringPreset } from './springs';
@@ -49,6 +49,30 @@ const seeded = (seed: number) => { let a = seed >>> 0; return () => { a = (a + 0
 
 /** A column laid out in the band, its children centred: the content decides how tall it is. */
 const stack = (ctx: Ctx, children: ReactNode, gap = 28, extra: CSSProperties = {}) => h('div', { style: box({ left: 60, width: W - 120, top: ctx.band.top, height: ctx.band.bottom - ctx.band.top, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap, ...extra }) }, children);
+/**
+ * A column that fills the band: it is drawn at its natural size, measured, and scaled up (never down past 1) until it uses most of the band, so a
+ * short list is large and a long one is not. The scale is a pure function of the content (its layout does not depend on the frame), so every frame agrees.
+ */
+const FIT_MAX = 1.6, FIT_TARGET = 0.8, FIT_LIMIT = 0.94;
+function FitBand(props: { band: Band; gap: number; extra: CSSProperties; max?: number; children?: ReactNode }): ReactElement {
+  const max = props.max ?? FIT_MAX;
+  const ref = useRef<HTMLDivElement>(null), tries = useRef(0), [scale, setScale] = useState(1);
+  const bandH = props.band.bottom - props.band.top;
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || tries.current >= 6) return;
+    const natural = el.offsetHeight, shown = natural * scale;
+    let next = scale;
+    if (el.scrollWidth > el.clientWidth + 1) next = Math.max(1, scale * (el.clientWidth / el.scrollWidth) * 0.97);   // wider than its column at this scale: step back
+    else if (shown > bandH * FIT_LIMIT) next = Math.max(1, (bandH * FIT_LIMIT) / natural);
+    else if (shown < bandH * FIT_TARGET * 0.92 && scale < max) next = Math.min(max, (bandH * FIT_TARGET) / natural);
+    if (Math.abs(next - scale) > 0.02) { tries.current += 1; setScale(next); }
+  });
+  return h('div', { style: box({ left: 0, width: W, top: props.band.top, height: bandH, display: 'flex', alignItems: 'center', justifyContent: 'center' }) },
+    h('div', { ref, style: { width: (W - 120) / scale, flex: 'none', display: 'flex', flexDirection: 'column', gap: props.gap, transform: `scale(${scale})`, transformOrigin: 'center center', ...props.extra } }, props.children));
+}
+/** A `stack` that fills the band: for scenes whose content is a list or a pair of cards, which are small when short. */
+const fitStack = (ctx: Ctx, children: ReactNode, gap = 28, extra: CSSProperties = {}, max?: number) => h(FitBand, { band: ctx.band, gap, extra, max }, children);
 const sentence = (ctx: Ctx, text?: string) => (text && !ctxCaptions(ctx) ? h('div', { key: 'cap', style: { ...display(ctx, 700), fontSize: 46, lineHeight: 1.25, textAlign: 'center', marginTop: 14, ...arrive(ctx, Math.round(ctx.frames * 0.7)) } }, text) : null);
 const ctxCaptions = (ctx: Ctx) => (ctx as Ctx & { captions?: boolean }).captions === true;
 
@@ -69,9 +93,9 @@ function compare(ctx: Ctx, s: Record<string, any>, variant: string): ReactElemen
   const pick = variant !== 'auto' ? variant : long > 34 || total >= 7 ? 'stacked' : sides.every(x => x.title.length <= 14 && x.points.length <= 2) ? 'versus' : 'split';
   if (pick === 'halves') {
     const band = (side: typeof sides[number], i: number) => h('div', { key: side.key, style: { borderLeft: `18px solid ${side.tone}` } }, bleedBlock(ctx, side.key, i === 0 ? col(ctx, 'surface') : side.tone, [
-      h('div', { key: 't', style: { ...onBand(ctx, 66, 900), color: i === 0 ? col(ctx, 'text') : col(ctx, 'bg'), ...arrive(ctx, 4 + i * 30) } }, side.title),
-      ...side.points.map((p, k) => h('div', { key: k, style: { display: 'flex', gap: 18, ...body(ctx, 600), fontSize: 38, lineHeight: 1.25, color: i === 0 ? col(ctx, 'text') : col(ctx, 'bg'), ...arrive(ctx, 14 + i * 30 + k * 12, 18, 24) } },
-        h('span', { style: { fontWeight: 900 } }, side.mark), h('span', null, p)))], 18, '54px 42px'));
+      h('div', { key: 't', style: { ...onBand(ctx, 84, 900), color: i === 0 ? col(ctx, 'text') : col(ctx, 'bg'), ...arrive(ctx, 4 + i * 30) } }, side.title),
+      ...side.points.map((p, k) => h('div', { key: k, style: { display: 'flex', gap: 18, ...body(ctx, 600), fontSize: 46, lineHeight: 1.25, color: i === 0 ? col(ctx, 'text') : col(ctx, 'bg'), ...arrive(ctx, 14 + i * 30 + k * 12, 18, 24) } },
+        h('span', { style: { fontWeight: 900 } }, side.mark), h('span', null, p)))], 22, '64px 42px'));
     return fullStack(ctx, [h('div', { key: 'halves', style: { display: 'flex', flexDirection: 'column' } }, band(sides[0]!, 0), band(sides[1]!, 1)), s.caption && !ctxCaptions(ctx) ? inset('cap', sentence(ctx, s.caption)) : null], 36);
   }
   const point = (side: typeof sides[number], p: string, k: number, at: number, size: number) => h('div', { key: k, style: { display: 'flex', gap: 16, alignItems: 'flex-start', ...arrive(ctx, at + 10 + k * 14, 18, 24) } },
@@ -79,20 +103,20 @@ function compare(ctx: Ctx, s: Record<string, any>, variant: string): ReactElemen
   if (pick === 'stacked') {
     const card = (side: typeof sides[number], i: number) => h(GlassCard, { key: side.key, delay: 6 + i * 40, style: { ...solid(ctx), border: `3px solid ${side.tone}`, borderRadius: radius(ctx, 28), padding: '34px 40px', display: 'flex', flexDirection: 'column', gap: 16 } },
       h('div', { style: { ...display(ctx, 800), fontSize: 58, color: side.tone, lineHeight: 1.05 } }, side.title), ...side.points.map((p, k) => point(side, p, k, 6 + i * 40, 38)));
-    return stack(ctx, [card(sides[0]!, 0), h('div', { key: 'arrow', style: { ...mono(ctx), color: col(ctx, 'muted'), textAlign: 'center', fontSize: 28, ...arrive(ctx, 30) } }, '↓ so instead ↓'), card(sides[1]!, 1), sentence(ctx, s.caption)], 22);
+    return fitStack(ctx, [card(sides[0]!, 0), h('div', { key: 'arrow', style: { ...mono(ctx), color: col(ctx, 'muted'), textAlign: 'center', fontSize: 28, ...arrive(ctx, 30) } }, '↓ so instead ↓'), card(sides[1]!, 1), sentence(ctx, s.caption)], 22, {}, 1.25);
   }
   if (pick === 'versus') {
     const half = (side: typeof sides[number], i: number) => h('div', { key: side.key, style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: i === 0 ? 'flex-end' : 'flex-start', textAlign: i === 0 ? 'right' : 'left', gap: 20, ...arrive(ctx, 6 + i * 22, 24, i === 0 ? 0 : 0) } },
       h('div', { style: { ...display(ctx, 900), fontSize: 66, color: side.tone, lineHeight: 1 } }, side.title),
       h('div', { style: { height: 4, width: 120 * sp(ctx, 14 + i * 22), background: side.tone, borderRadius: 2 } }),
       ...side.points.map((p, k) => h('div', { key: k, style: { ...body(ctx, 500), fontSize: 40, lineHeight: 1.25, ...arrive(ctx, 30 + i * 20 + k * 16, 18, 20) } }, p)));
-    return stack(ctx, [h('div', { key: 'row', style: { display: 'flex', alignItems: 'center', gap: 28 } }, half(sides[0]!, 0),
+    return fitStack(ctx, [h('div', { key: 'row', style: { display: 'flex', alignItems: 'center', gap: 28 } }, half(sides[0]!, 0),
       h('div', { key: 'vs', style: { ...display(ctx, 900), width: 112, height: 112, flex: 'none', borderRadius: 56, background: col(ctx, 'accent'), color: col(ctx, 'bg'), fontSize: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', transform: `scale(${sp(ctx, 4, 'bouncy')})` } }, 'VS'),
       half(sides[1]!, 1)), sentence(ctx, s.caption)], 56);
   }
   const card = (side: typeof sides[number], i: number) => h(GlassCard, { key: side.key, delay: 6 + i * 16, style: { flex: 1, minWidth: 0, alignSelf: 'stretch', ...solid(ctx), borderTop: `8px solid ${side.tone}`, borderRadius: radius(ctx, 24), padding: '30px 28px', display: 'flex', flexDirection: 'column', gap: 20 } },
     h('div', { style: { ...display(ctx, 800), fontSize: 46, color: side.tone, lineHeight: 1.05 } }, side.title), ...side.points.map((p, k) => point(side, p, k, 6 + i * 16, 34)));
-  return stack(ctx, [h('div', { key: 'row', style: { display: 'flex', gap: 24, alignItems: 'stretch' } }, card(sides[0]!, 0), card(sides[1]!, 1)), sentence(ctx, s.caption)], 30);
+  return fitStack(ctx, [h('div', { key: 'row', style: { display: 'flex', gap: 24, alignItems: 'stretch' } }, card(sides[0]!, 0), card(sides[1]!, 1)), sentence(ctx, s.caption)], 30, {}, 1.25);
 }
 
 /* ---- chart: columns, rows or a line ---- */
@@ -196,14 +220,14 @@ function steps(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement 
   const gap = Math.min(30, Math.max(14, (ctx.frames - 60) / n)), at = (k: number) => 8 + k * gap;
   const cur = Math.min(n - 1, Math.floor(clamp((ctx.frame - 12) / Math.max(1, ctx.frames - 40)) * n)), lit = (k: number) => k <= cur;
   if (pick === 'bento') {
-    return stack(ctx, [h(BentoGrid, { key: 'bento', columns: 2, gap: 22 }, ...items.map((item, k) => h(BentoCard, { key: k, delay: at(k), colSpan: k === 0 && n % 2 === 1 ? 2 : 1, glowColor: 'transparent',
+    return fitStack(ctx, [h(BentoGrid, { key: 'bento', columns: 2, gap: 22 }, ...items.map((item, k) => h(BentoCard, { key: k, delay: at(k), colSpan: k === 0 && n % 2 === 1 ? 2 : 1, glowColor: 'transparent',
       style: { ...solid(ctx), border: `3px solid ${lit(k) ? col(ctx, 'accent') : 'transparent'}`, borderRadius: radius(ctx, 26), padding: 30, boxShadow: 'none', gap: 8 },
       title: h('span', { style: { ...display(ctx, 800), fontSize: 44, lineHeight: 1.1 } }, item.title),
       badge: h(Badge, { dot: false, delay: at(k) + 4, style: { background: lit(k) ? col(ctx, 'accent') : col(ctx, 'bg'), border: 'none', color: lit(k) ? col(ctx, 'bg') : col(ctx, 'muted'), fontSize: 30, fontWeight: 800, padding: '4px 18px' } }, String(k + 1)),
       subtitle: item.detail ? h('span', { style: { ...body(ctx), fontSize: 28, lineHeight: 1.3, color: col(ctx, 'muted') } }, item.detail) : undefined }))), sentence(ctx, s.caption)], 26);
   }
   if (pick === 'ladder') {
-    return stack(ctx, [h('div', { key: 'ladder', style: { position: 'relative', paddingLeft: 96, display: 'flex', flexDirection: 'column', gap: 44 } },
+    return fitStack(ctx, [h('div', { key: 'ladder', style: { position: 'relative', paddingLeft: 96, display: 'flex', flexDirection: 'column', gap: 44 } },
       h('div', { style: box({ left: 30, top: 20, width: 6, height: '100%', background: col(ctx, 'muted'), opacity: 0.3, borderRadius: 3 }) }),
       h('div', { style: box({ left: 30, top: 20, width: 6, height: `${land(run(ctx.frame, 8, ctx.frames - 30)) * 94}%`, background: col(ctx, 'accent'), borderRadius: 3 }) }),
       ...items.map((item, k) => h('div', { key: k, style: { position: 'relative', ...arrive(ctx, at(k), 20, 30) } },
@@ -212,11 +236,11 @@ function steps(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement 
         item.detail ? h('div', { style: { ...body(ctx, 500), fontSize: 32, lineHeight: 1.3, marginTop: 8, color: col(ctx, 'muted') } }, item.detail) : null))), sentence(ctx, s.caption)], 30);
   }
   if (pick === 'list') {
-    return stack(ctx, [...items.map((item, k) => h('div', { key: k, style: { display: 'flex', alignItems: 'baseline', gap: 26, borderBottom: '3px solid ' + col(ctx, 'muted') + '55', paddingBottom: 20, ...arrive(ctx, at(k), 18, 24) } },
+    return fitStack(ctx, [...items.map((item, k) => h('div', { key: k, style: { display: 'flex', alignItems: 'baseline', gap: 26, borderBottom: '3px solid ' + col(ctx, 'muted') + '55', paddingBottom: 20, ...arrive(ctx, at(k), 18, 24) } },
       h('span', { style: { ...display(ctx, 900), fontSize: 64, color: lit(k) ? col(ctx, 'accent') : col(ctx, 'muted'), minWidth: 90 } }, String(k + 1).padStart(2, '0')),
       h('div', { style: { minWidth: 0 } }, h('div', { style: { ...display(ctx, 700), fontSize: 42, lineHeight: 1.15 } }, item.title), item.detail ? h('div', { style: { ...body(ctx), fontSize: 28, color: col(ctx, 'muted'), marginTop: 4 } }, item.detail) : null))), sentence(ctx, s.caption)], 26);
   }
-  return stack(ctx, [...items.map((item, k) => h(GlassCard, { key: k, delay: at(k), style: { ...solid(ctx), borderRadius: radius(ctx, 26), padding: '28px 34px', display: 'flex', alignItems: 'center', gap: 28, border: `3px solid ${lit(k) ? col(ctx, 'accent') : 'transparent'}` } },
+  return fitStack(ctx, [...items.map((item, k) => h(GlassCard, { key: k, delay: at(k), style: { ...solid(ctx), borderRadius: radius(ctx, 26), padding: '28px 34px', display: 'flex', alignItems: 'center', gap: 28, border: `3px solid ${lit(k) ? col(ctx, 'accent') : 'transparent'}` } },
     h('div', { style: { ...display(ctx, 900), fontSize: 96, lineHeight: 1, color: lit(k) ? col(ctx, 'accent') : col(ctx, 'muted'), minWidth: 80, textAlign: 'center' } }, String(k + 1)),
     h('div', { style: { minWidth: 0 } }, h('div', { style: { ...display(ctx, 800), fontSize: 44, lineHeight: 1.15 } }, item.title), item.detail ? h('div', { style: { ...body(ctx), fontSize: 28, color: col(ctx, 'muted'), marginTop: 6 } }, item.detail) : null))), sentence(ctx, s.caption)], 24);
 }
@@ -238,7 +262,7 @@ function timeline(ctx: Ctx, s: Record<string, any>, variant: string): ReactEleme
     const dot = h('div', { style: box({ left: spineLeft + 3 - 17, top: 10, width: 34, height: 34, borderRadius: 17, background: col(ctx, 'accent'), transform: `scale(${sp(ctx, at(k), 'bouncy')})` }) });
     return h('div', { key: k, style: { position: 'relative' } }, dot, text);
   };
-  return stack(ctx, [h('div', { key: 'tl', style: { position: 'relative', display: 'flex', flexDirection: 'column', gap: 46 } }, spine, fill, ...events.map(item)), sentence(ctx, s.caption)], 30);
+  return fitStack(ctx, [h('div', { key: 'tl', style: { position: 'relative', display: 'flex', flexDirection: 'column', gap: 46 } }, spine, fill, ...events.map(item)), sentence(ctx, s.caption)], 30);
 }
 
 /* ---- stat: one number, as a hero, a ring or stacked over its label ---- */
@@ -286,10 +310,10 @@ function quote(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement 
       h(Typewriter, { text, delay: 6, speed: Math.max(0.5, text.length / (ctx.frames * 0.55)), style: { display: 'block', ...display(ctx, 600), fontFamily: '"JetBrains Mono", monospace', fontSize: 44, lineHeight: 1.35, whiteSpace: 'pre-wrap' }, cursorStyle: { color: col(ctx, 'accent') } })), who, sentence(ctx, s.caption)], 34);
   }
   if (pick === 'pull') {
-    return stack(ctx, [stamp, h('div', { key: 'q', style: { display: 'flex', gap: 30 } }, h('div', { style: { width: 10, flex: 'none', background: col(ctx, 'accent'), borderRadius: 5, transform: `scaleY(${sp(ctx, 4)})`, transformOrigin: 'top' } }),
+    return fitStack(ctx, [stamp, h('div', { key: 'q', style: { display: 'flex', gap: 30 } }, h('div', { style: { width: 10, flex: 'none', background: col(ctx, 'accent'), borderRadius: 5, transform: `scaleY(${sp(ctx, 4)})`, transformOrigin: 'top' } }),
       h('div', { style: { ...display(ctx, 700), fontSize: 50, lineHeight: 1.25, ...arrive(ctx, 10, 24) } }, `“${s.text}”`)), who, sentence(ctx, s.caption)], 34);
   }
-  return stack(ctx, [h(GlassCard, { key: 'card', delay: 4, style: { ...solid(ctx), borderRadius: radius(ctx, 30), padding: '50px 46px', display: 'flex', flexDirection: 'column', gap: 30, position: 'relative' } },
+  return fitStack(ctx, [h(GlassCard, { key: 'card', delay: 4, style: { ...solid(ctx), borderRadius: radius(ctx, 30), padding: '50px 46px', display: 'flex', flexDirection: 'column', gap: 30, position: 'relative' } },
     h('div', { style: { ...display(ctx, 900), fontSize: 180, lineHeight: 0.6, color: col(ctx, 'accent'), height: 70 } }, '“'), h('div', { style: { ...display(ctx, 600), fontSize: 48, lineHeight: 1.3 } }, s.text), who, stamp), sentence(ctx, s.caption)], 30);
 }
 
@@ -322,8 +346,8 @@ function closing(ctx: Ctx, s: Record<string, any>, variant: string): ReactElemen
   const points = (s.points ?? []) as string[];
   const pick = variant !== 'auto' ? variant : points.length ? 'takeaway' : 'poster';
   const cta = h('div', { key: 'cta', style: { alignSelf: pick === 'poster' ? 'center' : 'flex-start', background: col(ctx, 'accent'), color: col(ctx, 'bg'), ...display(ctx, 800), fontSize: 42, padding: '22px 46px', borderRadius: radius(ctx, 60), ...arrive(ctx, Math.round(ctx.frames * 0.5), 20, 26) } }, s.cta ?? 'Follow for more');
-  if (pick === 'poster') return stack(ctx, [h('div', { key: 't', style: { ...display(ctx, 900), fontSize: 120, lineHeight: 1.05, textAlign: 'center' } }, h(KineticText, { text: String(s.title), delay: 4, staggerDelay: 3, preset: 'snappy', style: { justifyContent: 'center' } })), h(Waveform, { key: 'wave', bars: 28, height: 70, delay: 14, color: col(ctx, 'accent2'), activeColor: col(ctx, 'accent'), style: { alignSelf: 'center' } }), cta], 70);
-  return stack(ctx, [h('div', { key: 'rule', style: { height: 8, width: 140 * sp(ctx, 2), background: col(ctx, 'accent'), borderRadius: 4 } }),
+  if (pick === 'poster') return fitStack(ctx, [h('div', { key: 't', style: { ...display(ctx, 900), fontSize: 120, lineHeight: 1.05, textAlign: 'center' } }, h(KineticText, { text: String(s.title), delay: 4, staggerDelay: 3, preset: 'snappy', style: { justifyContent: 'center' } })), h(Waveform, { key: 'wave', bars: 28, height: 70, delay: 14, color: col(ctx, 'accent2'), activeColor: col(ctx, 'accent'), style: { alignSelf: 'center' } }), cta], 70);
+  return fitStack(ctx, [h('div', { key: 'rule', style: { height: 8, width: 140 * sp(ctx, 2), background: col(ctx, 'accent'), borderRadius: 4 } }),
     h('div', { key: 't', style: { ...display(ctx, 900), fontSize: 88, lineHeight: 1.05, color: col(ctx, 'accent') } }, h(KineticText, { text: String(s.title), delay: 4, staggerDelay: 3, preset: 'snappy' })),
     ...points.map((p, k) => h('div', { key: 'p' + k, style: { display: 'flex', gap: 20, ...body(ctx, 600), fontSize: 42, lineHeight: 1.25, ...arrive(ctx, 18 + k * 14, 20, 24) } }, h('span', { style: { color: col(ctx, 'accent') } }, '→'), h('span', null, p))), cta], 34);
 }
