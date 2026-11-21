@@ -6,7 +6,7 @@
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { basename, dirname, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { compositionJsonSchema, describeError, loadComposition } from '@ove/core';
 import { resolveBuildable, type Buildable } from '@ove/builder';
@@ -192,6 +192,27 @@ export const __render = (frame, props, cfg) => { let tree = __ce(__getComp(), pr
   await writeFile(resolve(dirname(output), 'composition.schema.json'), JSON.stringify(compositionJsonSchema, null, 2) + '\n');
   console.log(`Wrote ${output} and ${bundleName} (${(bundle.length / 1024).toFixed(0)} KB)\n  ${composition.width}x${composition.height}, ${(composition.durationFrames / composition.fps).toFixed(1)} s, a React video`);
   console.log(`\nNext:\n  ove still ${output} --allow-code --frame 30 --output still.png\n  ove review ${output} --allow-code --output review.png\n  ove render ${output} --allow-code --output out.mp4\n\nThe component runs JavaScript while rendering: render only files you trust. Pictures it uses must be declared in config.assets (type "image") and named by id or path in <img src>.`);
+}
+
+/** Whether a path is a React video source (video.tsx or video.jsx) rather than a composition or a script. */
+export const isVideoSource = (file: string): boolean => /\.[jt]sx$/i.test(file);
+
+/**
+ * Builds a React video (video.tsx) into a hidden `.motionrender/` folder beside it and returns the composition to run, so a video is written as code and no
+ * composition.json has to exist in the project: render, still, review and make take the .tsx itself. The bundle is the only thing the composition points at,
+ * so its path is made relative to the video's own folder, which stays the place its pictures, clips and sounds are found.
+ */
+export async function buildVideoSource(source: string): Promise<{ raw: any; baseDir: string; compositionPath: string }> {
+  const file = resolve(source), baseDir = dirname(file), folder = resolve(baseDir, '.motionrender'), compositionPath = resolve(folder, 'composition.json');
+  await mkdir(folder, { recursive: true });
+  await buildReact(file, compositionPath);
+  const raw = JSON.parse(await readFile(compositionPath, 'utf8'));
+  const point = (layers: any[] | undefined) => layers?.forEach(layer => {
+    if (layer.type === 'react' && typeof layer.src === 'string' && !isAbsolute(layer.src) && !layer.src.startsWith('.motionrender/')) layer.src = `.motionrender/${layer.src}`;
+    if (Array.isArray(layer.children)) point(layer.children);
+  });
+  raw.scenes?.forEach((scene: any) => point(scene.layers)); point(raw.overlay);
+  return { raw, baseDir, compositionPath };
 }
 
 export async function runBuild(argv: string[]): Promise<void> {

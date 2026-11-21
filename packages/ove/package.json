@@ -36,6 +36,7 @@
   "files": [
     "dist",
     "starter",
+    "starter-react",
     "blocks",
     "themes",
     "studio",

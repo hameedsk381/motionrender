@@ -51,7 +51,7 @@ export default function Promo({ title }) {
 }
 ```
 
-- `ove build promo.tsx` (needs `react`, `react-dom`, `esbuild` installed) writes `composition.json` and `promo.bundle.js`; render with `--allow-code`. Rebuild after every edit.
+- A React video is its `.tsx`: `mr make promo.tsx`, `mr render promo.tsx --output out.mp4`, `mr still` and `mr review` take it directly (needs `react`, `react-dom`, `esbuild` installed). The build keeps its work in a hidden `.motionrender/` folder, so there is no composition.json to edit or rebuild. (`ove build promo.tsx` still writes one next to the file.)
 - Audio and video: `<Audio src="sfx:whoosh" />` and `<Video src="..." />` are automatically scanned and promoted to native audio/video layers.
 - For complete guide, component library, and spring presets, read the **`ove-react-video`** skill.
 

@@ -5,7 +5,7 @@ type Spec = { values?: string[]; flags?: string[]; positionals?: number };
 const variables = ['--var', '--vars'];
 const renderValues = ['--output', '--format', '--codec', '--frames', '--crf', '--bitrate', '--audio-bitrate', '--scale', '--loudness', '--concurrency', '--preset', '--workers', '--chunk-size', '--token', '--batch', '--aspect'];
 export const commandSpecs: Record<string, Spec> = {
-  init: { values: [], flags: ['--force', '--no-skill'], positionals: 1 },
+  init: { values: [], flags: ['--force', '--no-skill', '--react'], positionals: 1 },
   schema: { values: ['--output'], flags: ['--explainer'] },
   soundtrack: { values: ['--audio', '--output'], positionals: 1 },
   doctor: {},

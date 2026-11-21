@@ -13,6 +13,7 @@ packages/ove/dist
 packages/ove/studio
 packages/ove/site
 packages/ove/starter
+packages/ove/starter-react
 packages/ove/skills
 packages/cli/studio
 **/*.mp4

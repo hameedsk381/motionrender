@@ -4,6 +4,8 @@ All notable changes to MotionRender (formerly Open Video Engine). The published 
 
 ## Unreleased
 
+- **Videos are written as code.** A React video is its `.tsx`: `mr make video.tsx`, `mr render video.tsx`, `mr still`, `mr review`, `mr validate` and `mr inspect` take the source directly, and the build keeps its work in a hidden `.motionrender/` folder beside it, so a project holds no `composition.json`. Running your own source counts as trusting it (no `--allow-code`). `mr init my-video --react` starts a project with a readable `video.tsx` (the default `mr init` is unchanged and still writes a `composition.json`, which the package smoke test relies on). The renderer, the API and Studio still run on a composition internally; it is now generated, not authored. `mr build` still writes one next to the file.
+
 ## 0.10.0 (2026-11-18)
 
 - Author storyboards in Markdown or Studio and review the motion around each beat's decisive frame.

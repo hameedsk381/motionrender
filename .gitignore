@@ -16,6 +16,8 @@ artifacts/
 # Build output of `pnpm build:package` (the starter, skill and licence are copied in from their sources)
 packages/ove/dist/
 packages/ove/starter/
+packages/ove/starter-react/
+.motionrender/
 packages/ove/blocks/
 packages/ove/themes/
 packages/ove/studio/

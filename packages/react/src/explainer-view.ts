@@ -5,7 +5,7 @@
 // Every value is a pure function of the frame, like any other video component.
 import { createElement as h, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 import { useCurrentFrame, Video } from './index';
-import { AmbientGlow, Badge, BentoCard, BentoGrid, CodeEditor, DeviceFrame, GlassCard, KineticText, NumberTicker, ProgressBar, Typewriter, Waveform } from './components';
+import { AmbientGlow, Badge, BentoCard, BentoGrid, DeviceFrame, GlassCard, KineticText, NumberTicker, ProgressBar, Typewriter, Waveform } from './components';
 import { springValue, type SpringPreset } from './springs';
 import { Sequence } from './index';
 import { CompositionView, sceneStyle, transitionAt, type CompositionData } from './composition';
@@ -408,9 +408,18 @@ function code(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement {
   }
   let current = -1;
   picks.forEach((_, k) => { if (ctx.frame >= first + k * span) current = k; });
-  // The kit's editor is drawn at 14 px; zoom scales its layout (not just its paint) to a size that reads on a phone.
-  return stack(ctx, [h('div', { key: 'editor', style: { zoom: 2.2 } },
-    h(CodeEditor, { filename: String(s.file ?? 'main.ts'), language: s.language ? String(s.language) : '', code: String(s.code), highlightLines: current >= 0 ? [picks[current]!] : [], delay: 2, style: { borderRadius: radius(ctx, 10), boxShadow: 'none', fontFamily: '"JetBrains Mono", Consolas, monospace' } })), sentence(ctx, s.caption)], 36);
+  // The editor card is drawn at real sizes (code 34 px, labels 24 px), not the kit's 14 px zoomed up: the design review measures the text a page really draws,
+  // and zoom would leave it counting 11 to 14 px text that reads fine but is not that size.
+  const lines = String(s.code).split('\n'), lit = current >= 0 ? picks[current] : undefined, size = lines.some(line => line.length > 34) ? 30 : 34;
+  const monoFont = '"JetBrains Mono", Consolas, monospace';
+  return stack(ctx, [h('div', { key: 'editor', style: { background: col(ctx, 'surface'), border: `2px solid ${col(ctx, 'muted')}55`, borderRadius: radius(ctx, 24), overflow: 'hidden', ...arrive(ctx, 2, 20, 30) } },
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: 14, padding: '20px 28px', background: col(ctx, 'bg'), borderBottom: `2px solid ${col(ctx, 'muted')}33` } },
+      ...[RED, '#e8a548', GREEN].map(color => h('span', { key: color, style: { width: 18, height: 18, borderRadius: 9, background: color } })),
+      h('span', { style: { flex: 1, textAlign: 'center', fontFamily: monoFont, fontSize: 24, color: col(ctx, 'muted') } }, String(s.file ?? 'main.ts')),
+      s.language ? h('span', { style: { fontFamily: monoFont, fontSize: 24, color: col(ctx, 'muted'), textTransform: 'uppercase', letterSpacing: 2 } }, String(s.language)) : null),
+    h('div', { style: { padding: '24px 0' } }, ...lines.map((line, k) => h('div', { key: k, style: { display: 'flex', padding: '3px 28px', background: lit === k + 1 ? `${col(ctx, 'accent')}2e` : 'transparent', borderLeft: `6px solid ${lit === k + 1 ? col(ctx, 'accent') : 'transparent'}`, opacity: clamp(sp(ctx, 4 + k * 3) * 2) } },
+      h('span', { style: { width: 56, flex: 'none', textAlign: 'right', marginRight: 26, fontFamily: monoFont, fontSize: size - 6, lineHeight: 1.5, color: col(ctx, 'muted') } }, k + 1),
+      h('span', { style: { fontFamily: monoFont, fontSize: size, lineHeight: 1.5, whiteSpace: 'pre', color: col(ctx, 'text') } }, line || ' '))))), sentence(ctx, s.caption)], 36);
 }
 
 const drawings: Record<string, (ctx: Ctx, scene: Record<string, any>, variant: string) => ReactElement> = { compare, chart, flow, grid, steps, timeline, stat, quote, title, closing, freeform, phone, hex, pile, media, code };

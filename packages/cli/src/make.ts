@@ -7,6 +7,7 @@ import { dirname, extname, join, resolve } from 'node:path';
 import { explainerSchema, videoPlanSchema, type Explainer } from '@ove/schema';
 import { compileVideoPlan, defaultConcurrency, loadComposition, parseVideoMarkdown, proposePlanRepairs, renderMedia, reviewComposition, reviewRepairTasks, type Composition, type PlanRepairProposal, type ReviewIssue, type ReviewRepairTask } from '@ove/core';
 import { buildExplainer } from './explainer';
+import { buildVideoSource } from './build';
 
 export type MakeRender = 'draft' | 'final';
 export type MakeOptions = {
@@ -23,7 +24,7 @@ export type MakeOptions = {
 };
 export type MakeResult = {
   ok: boolean;
-  kind: 'explainer' | 'video-plan' | 'composition';
+  kind: 'explainer' | 'video-plan' | 'composition' | 'source';
   /** Problems that stopped the build, with their paths. Empty when the file was built. */ problems: string[];
   composition?: string;
   summary?: { scenes: number; seconds: number; width: number; height: number; fps: number; spoken?: number };
@@ -47,18 +48,23 @@ export const draftSettings = { scale: 0.5, preset: 'ultrafast' as const, crf: 32
 export async function makeVideo(options: MakeOptions): Promise<MakeResult> {
   const log = options.log ?? (() => {}), file = resolve(options.file), dir = dirname(file), timings: Record<string, number> = {}, notes: string[] = [];
   let started = Date.now();
-  let raw: unknown, kind: MakeResult['kind'] = extname(file).toLowerCase() === '.md' ? 'video-plan' : 'composition';
+  const isSource = /\.[jt]sx$/i.test(file);
+  let raw: unknown, kind: MakeResult['kind'] = isSource ? 'source' : extname(file).toLowerCase() === '.md' ? 'video-plan' : 'composition';
   const fail = (problems: string[]): MakeResult => ({ ok: false, kind, problems, notes, timings, next: ['Fix the problems listed and run make again.'] });
-  try { raw = kind === 'video-plan' ? parseVideoMarkdown(await readFile(file, 'utf8')) : await readJson(file); }
+  try { raw = isSource ? undefined : kind === 'video-plan' ? parseVideoMarkdown(await readFile(file, 'utf8')) : await readJson(file); }
   catch (error) {
     const issues = (error as { issues?: { path: PropertyKey[]; message: string }[] }).issues;
     return fail(issues?.map(issue => `${issue.path.join('.') || 'plan'}: ${issue.message}`) ?? [(error as Error).message]);
   }
-  kind = kindOfFile(raw);
+  if (!isSource) kind = kindOfFile(raw);
 
   // 1. Check and build.
-  let compositionPath = file, composition: Composition, plan: any, spoken: number | undefined, reacted = false, scriptScenes: number | undefined;
-  if (kind === 'explainer') {
+  let compositionPath = file, composition: Composition, plan: any, spoken: number | undefined, reacted = false, scriptScenes: number | undefined, sourceBase: string | undefined;
+  if (kind === 'source') {
+    log('Building the video…');
+    try { const built = await buildVideoSource(file); compositionPath = built.compositionPath; sourceBase = built.baseDir; composition = loadComposition(built.raw); }
+    catch (error) { return fail([(error as Error).message]); }
+  } else if (kind === 'explainer') {
     const parsed = explainerSchema.safeParse(raw);
     if (!parsed.success) return fail(parsed.error.issues.map(issue => `${issue.path.join('.') || 'script'}: ${issue.message}`));
     log('Building the video…');
@@ -82,7 +88,7 @@ export async function makeVideo(options: MakeOptions): Promise<MakeResult> {
     catch (error) { return fail([(error as Error).message]); }
   }
   timings.build = seconds(started);
-  const baseDir = dirname(compositionPath), allowCode = options.allowCode === true || reacted;   // a React build runs only MotionRender's own view, with the script as data
+  const baseDir = sourceBase ?? dirname(compositionPath), allowCode = options.allowCode === true || reacted || kind === 'source';   // running your own source is trusting it: the build already ran it   // a React build runs only MotionRender's own view, with the script as data
   if (hasCodeLayers(composition) && !allowCode) return fail(['This composition has react, code or p5 layers, which run JavaScript while checking and rendering. Run make again with allowCode (--allow-code) if you trust the file.']);
   const summary = { scenes: reacted && scriptScenes !== undefined ? scriptScenes : composition.scenes.filter(scene => scene.id !== 'overlay').length, seconds: Math.round((composition.durationFrames / composition.fps) * 10) / 10, width: composition.width, height: composition.height, fps: composition.fps, ...(spoken === undefined ? {} : { spoken }) };
 

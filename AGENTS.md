@@ -135,6 +135,8 @@ To integrate with OpenAI Custom GPTs or Codex Action agents:
 
 ## 5. The Agent Production Loop
 
+A video written as code is the loop's shortest form: write `video.tsx` (a React component; `mr init my-video --react` starts one), then `mr make video.tsx` (builds it, reviews it, draws one contact sheet), `mr make video.tsx --draft` and `mr render video.tsx --output out.mp4`. There is no composition.json to keep: the build keeps its work in a hidden `.motionrender/` folder. The steps below are for JSON compositions.
+
 Whenever an agent builds or edits a video without MCP:
 ```
 Agree Narrative / Brief

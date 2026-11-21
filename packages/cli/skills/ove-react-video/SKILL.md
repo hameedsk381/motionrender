@@ -92,26 +92,25 @@ export default function Video({ title, stat }: typeof config.props) {
 ## 2. Core Build Loop
 
 1. **Write or edit** `video.tsx`.
-2. **Build the bundle & composition**:
+2. **Check it in one call** (the video is the `.tsx`; there is no composition.json to build or keep):
    ```bash
-   ove build video.tsx
+   mr make video.tsx
    ```
-   * Compiles your React JSX with `esbuild`.
-   * Emits `video.bundle.js` and `composition.json`.
-3. **Inspect Still Frames**:
+   * Compiles your React with `esbuild` into a hidden `.motionrender/` folder beside the file, runs the design review and draws one contact sheet of the whole video (`review.png`). Fix what it lists and run it again.
+3. **Inspect Still Frames** (every command takes `video.tsx` itself):
    ```bash
-   ove still composition.json --frame 45 --output still-45.png
-   ove still composition.json --frame 135 --output still-135.png
+   mr still video.tsx --frame 45 --output still-45.png
+   mr still video.tsx --frame 135 --output still-135.png
    ```
-4. **Visual Review Sheet** (samples frames across the whole video):
+4. **A quick draft to see it move**:
    ```bash
-   ove review composition.json --output review.png
+   mr make video.tsx --draft
    ```
 5. **Render High-Quality MP4**:
    ```bash
-   ove render composition.json --allow-code --output out.mp4
+   mr render video.tsx --output out.mp4
    ```
-   *(Note: React videos execute component code during headless rendering, so `--allow-code` is required).*
+   *(Running your own source counts as trusting it, so `--allow-code` is not needed for a `.tsx`. A new project starts with `mr init my-video --react`.)*
 
 ---
 

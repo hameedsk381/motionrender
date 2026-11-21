@@ -154,7 +154,7 @@ Press Ctrl+C to stop.`);
     const stop=() => { worker.close().finally(() => process.exit(0)); }; process.once('SIGINT', stop); process.once('SIGTERM', stop); }
   else if (command === 'browser') { if (file !== 'install') throw new Error('Usage: ove browser install'); console.log('Downloading Playwright Chromium…'); await ensureChromium(); }
   else if (command === 'schema') { const json=JSON.stringify(argv.includes('--explainer') ? explainerJsonSchema : compositionJsonSchema,null,2)+'\n'; const output=option('--output'); if (output) { await writeFile(resolve(output),json); console.log(`Wrote ${resolve(output)}`); } else process.stdout.write(json); }
-  else if (command === 'init') { if (!file || file.startsWith('--')) throw new Error(usage); const files=await initProject(file,{force:flag('--force'),skill:!flag('--no-skill')}); console.log(`Created ${resolve(file)}\n${files.map(f=>`  ${f}`).join('\n')}\n\nNext:\n  ove still ${file}/composition.json --frame 45 --output still.png\n  ove render ${file}/composition.json --output ${file}/out.mp4 --var title="Hi there"`); }
+  else if (command === 'init') { if (!file || file.startsWith('--')) throw new Error(usage); const files=await initProject(file,{force:flag('--force'),skill:!flag('--no-skill'),react:flag('--react')}); console.log(`Created ${resolve(file)}\n${files.map(f=>`  ${f}`).join('\n')}\n\nNext:\n${flag('--react') ? `  mr make ${file}/video.tsx                       (checks it and draws one contact sheet)\n  mr render ${file}/video.tsx --output ${file}/out.mp4` : `  ove still ${file}/composition.json --frame 45 --output still.png\n  ove render ${file}/composition.json --output ${file}/out.mp4 --var title="Hi there"`}`); }
   else if (command === 'dev') { if (!file || file.startsWith('--')) throw new Error(usage); const port=option('--port') === undefined ? undefined : Number(option('--port')); if (port !== undefined && !(Number.isInteger(port) && port > 0 && port < 65536)) throw new Error('--port must be a port number');
     const allowHosts=argv.flatMap((arg, i) => arg === '--allow-host' && argv[i+1] ? [argv[i+1]!] : []); const dev=await startDevServer(file, { port, values: await suppliedValues(), allowHosts, allowCode: flag('--allow-code'), aspect: option('--aspect') }); console.log(`Previewing ${resolve(file)}\n  ${dev.url}\nSaving the file reloads the preview. Press Ctrl+C to stop.`);
     const stop=() => { dev.close().finally(() => process.exit(0)); }; process.once('SIGINT', stop); process.once('SIGTERM', stop); }
@@ -234,7 +234,11 @@ Press Ctrl+C to stop.`);
   else if (command === 'facts') await (await import('./facts')).runFacts(argv);
   else if (command === 'explainer') await (await import('./explainer')).runExplainer(argv);
   else if (command === 'make') await (await import('./make-command')).runMake(argv);
-  else { if (!command || !file) throw new Error(usage); const raw=await readJson(file); const baseDir=dirname(resolve(file));
+  else { if (!command || !file) throw new Error(usage);
+    // A React video source (video.tsx) is built first, into a hidden folder beside it. Running your own source is trusting it, as the build already ran it.
+    let raw: any, baseDir: string;
+    if (/\.[jt]sx$/i.test(file)) { const build = await import('./build'); ({ raw, baseDir } = await build.buildVideoSource(file)); if (!argv.includes('--allow-code')) argv.push('--allow-code'); }
+    else { raw=await readJson(file); baseDir=dirname(resolve(file)); }
     if (command === 'render' && option('--batch')) await renderBatch(raw, baseDir);
     else { const values=await suppliedValues(), targetAspect=option('--aspect');
       let composition=await prepareComposition(raw, values, baseDir);
