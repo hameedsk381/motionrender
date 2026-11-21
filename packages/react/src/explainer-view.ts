@@ -190,7 +190,7 @@ function steps(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement 
       h('div', { style: box({ left: 30, top: 20, width: 6, height: '100%', background: col(ctx, 'muted'), opacity: 0.3, borderRadius: 3 }) }),
       h('div', { style: box({ left: 30, top: 20, width: 6, height: `${land(run(ctx.frame, 8, ctx.frames - 30)) * 94}%`, background: col(ctx, 'accent'), borderRadius: 3 }) }),
       ...items.map((item, k) => h('div', { key: k, style: { position: 'relative', ...arrive(ctx, at(k), 20, 30) } },
-        h('div', { style: box({ left: -96, top: -2, width: 68, height: 68, borderRadius: 34, background: lit(k) ? col(ctx, 'accent') : col(ctx, 'surface'), color: lit(k) ? col(ctx, 'bg') : col(ctx, 'muted'), display: 'flex', alignItems: 'center', justifyContent: 'center', ...display(ctx, 900), fontSize: 36 }) }, String(k + 1)),
+        h('div', { style: box({ left: -96, top: -2, width: 68, height: 68, borderRadius: 34, background: lit(k) ? col(ctx, 'accent') : col(ctx, 'surface'), color: lit(k) ? col(ctx, 'bg') : col(ctx, 'text'), display: 'flex', alignItems: 'center', justifyContent: 'center', ...display(ctx, 900), fontSize: 36 }) }, String(k + 1)),
         h('div', { style: { ...display(ctx, 800), fontSize: 48, lineHeight: 1.1, color: lit(k) ? col(ctx, 'text') : col(ctx, 'muted') } }, item.title),
         item.detail ? h('div', { style: { ...body(ctx, 500), fontSize: 32, lineHeight: 1.3, marginTop: 8, color: col(ctx, 'muted') } }, item.detail) : null))), sentence(ctx, s.caption)], 30);
   }

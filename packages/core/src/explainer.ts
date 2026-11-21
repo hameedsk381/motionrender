@@ -83,7 +83,7 @@ const rng = (seed: number) => () => { seed = (seed + 0x6d2b79f5) | 0; let t = Ma
 type Draw = { min: number; layers: (frames: number) => Layer[] };
 type Kind<S extends ExplainerScene['kind']> = (scene: Extract<ExplainerScene, { kind: S }>, i: number) => Draw;
 const at = (frames: number, fraction: number) => Math.round(frames * fraction);
-const kicker = (i: number, step?: string): Layer[] => (step ? [label(`kicker-${i}`, `— ${step}`, 60, 218, { size: 22, ls: 4, color: '{{muted}}', anims: [fade(2, 12)] })] : []);
+const kicker = (i: number, step?: string): Layer[] => (step ? [label(`kicker-${i}`, `— ${step}`, 60, 218, { size: 24, ls: 4, color: '{{muted}}', anims: [fade(2, 12)] })] : []);
 
 const title: Kind<'title'> = (s, i) => ({ min: 165, layers: () => {
   const n = s.lines.length, hi = s.highlight !== undefined && s.highlight < n ? s.highlight : n === 3 ? 1 : 0;
@@ -169,7 +169,7 @@ const grid: Kind<'grid'> = (s, i) => ({ min: 240, layers: frames => {
   if (s.result) {
     const cardY = gy + rows * pitch + 28;
     layers.push(outline('card', 230, cardY, 620, 190, GOLD, { radius: 14, fill: '{{surface}}', strokeWidth: 3, anims: [pop(card, 18, 0.9)] }),
-      ...(s.resultNote ? [label('card-kicker', 'THIS IS CALLED', W / 2, cardY + 30, { size: 20, ls: 5, color: '{{muted}}', align: 'center', anims: [fade(card + 10, 10)] })] : []),
+      ...(s.resultNote ? [label('card-kicker', 'THIS IS CALLED', W / 2, cardY + 30, { size: 24, ls: 5, color: '{{muted}}', align: 'center', anims: [fade(card + 10, 10)] })] : []),
       center('card-title', s.result, cardY + (s.resultNote ? 76 : 50), { font: '{{fontDisplay}}', weight: 900, size: 84, color: GOLD, maxWidth: 560, maxLines: 1, minSize: 50, anims: [rise(cardY + (s.resultNote ? 76 : 50), card + 14, 24, 18)] }),
       ...(s.resultNote ? [label('card-note', s.resultNote, W / 2, cardY + 168, { size: 20, ls: 3, color: '{{muted}}', align: 'center', anims: [fade(card + 24, 10)] })] : []),
       sfx('ding', card + 2, 0.25));
@@ -599,7 +599,7 @@ function chapterBar(i: number, n: number, frames: number): Layer[] {
   return [
     ...Array.from({ length: n }, (_, k) => rect(`chapter-${k}`, x(k), CHAPTER_Y, width, 8, { radius: 4, fill: k < i ? GOLD : '{{muted}}', opacity: k < i ? 0.95 : 0.3 })),
     rect('chapter-fill', x(i), CHAPTER_Y, 1, 8, { radius: 4, fill: GOLD, anims: [anim('width', [0, 1], [frames, width, 'linear'])] }),
-    label('chapter-count', `${String(i + 1).padStart(2, '0')} / ${String(n).padStart(2, '0')}`, W - 120, 218, { size: 22, ls: 4, color: '{{muted}}', align: 'right' }),
+    label('chapter-count', `${String(i + 1).padStart(2, '0')} / ${String(n).padStart(2, '0')}`, W - 120, 218, { size: 24, ls: 4, color: '{{muted}}', align: 'right' }),
   ];
 }
 
@@ -671,9 +671,9 @@ function compileWith(spec: Explainer, options: CompileOptions, palette: Record<s
   const bed = spec.music !== 'none' && (audio ?? []).some(Boolean)
     ? { audio: `sfx:bed-${spec.music}`, audioVolume: 1, duck: { amount: 0.4, attackFrames: 6, releaseFrames: 18 } } : {};
   const overlay: Layer[] = [
-    label('header-kind', `${spec.series} ·`, 60, HEADER_Y, { size: 22, ls: 3, color: '{{muted}}' }),
-    label('header-topic', '{{topic}}', 60 + (spec.series.length + 3) * 16.2, HEADER_Y, { size: 22, ls: 3, color: GOLD }),
-    label('header-handle', '{{handle}}', W - 120, HEADER_Y, { size: 22, ls: 3, color: '{{muted}}', align: 'right' }),
+    label('header-kind', `${spec.series} ·`, 60, HEADER_Y, { size: 24, ls: 3, color: '{{muted}}' }),
+    label('header-topic', '{{topic}}', 60 + (spec.series.length + 3) * 16.2, HEADER_Y, { size: 24, ls: 3, color: GOLD }),
+    label('header-handle', '{{handle}}', W - 120, HEADER_Y, { size: 24, ls: 3, color: '{{muted}}', align: 'right' }),
   ];
   // The header and footer are not scene layers, so no scene camera reaches them: scale the column by hand.
   const board = column ? [{ id: 'column', type: 'group', x: (cw - W * fit) / 2, y: (ch - H * fit) / 2, scale: fit, children: overlay }] : overlay;

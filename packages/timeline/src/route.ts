@@ -10,7 +10,7 @@ export function scheduleRoute(route: Route, frames: number) {
   const stops = (route.variant === 'rail' ? railOrder : route.stops).map((name, i) => {
     if (route.variant === 'rail') return { name, x: .16 + .68 * i / (railOrder.length - 1), y: .55 };
     const angle = Math.PI * 2 * i / route.stops.length - Math.PI / 2;
-    return { name, x: .5 + .31 * Math.cos(angle), y: .53 + .23 * Math.sin(angle) };
+    return { name, x: .5 + .31 * Math.cos(angle), y: .45 + .17 * Math.sin(angle) };
   });
   let cursor = 0;
   const trips = route.trips.map(trip => {
