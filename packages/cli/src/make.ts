@@ -139,6 +139,7 @@ export function makeReport(result: MakeResult): string {
   for (const issue of r.errors) lines.push(show(issue, 'ERROR'));
   for (const issue of r.warnings.slice(0, 8)) lines.push(show(issue, 'warn '));
   if (r.warnings.length > 8) lines.push(`  …and ${r.warnings.length - 8} more warnings`);
+  for (const issue of r.notes.slice(0, 5)) lines.push(show(issue, 'note '));
   for (const note of result.notes) lines.push(`Note: ${note}`);
   if (r.repairs.length) {
     lines.push(`Repairs: ${r.repairs.length} actionable task${r.repairs.length === 1 ? '' : 's'}.`);

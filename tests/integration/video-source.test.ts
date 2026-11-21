@@ -57,3 +57,23 @@ export default function Video() { return <AbsoluteFill><Img src="${assets ? 'pic
     expect(makeReport(result)).not.toMatch(/did not load/);
   }, 240_000);
 });
+
+// A video can pass every other check and still look empty: the review says how much of the usable height the picture fills.
+describe('make on a video that fills little of the frame', () => {
+  const film = (body: string) => `import { AbsoluteFill } from 'motionrender/react';
+export const config = { id: 'fill', width: 540, height: 960, fps: 30, durationInFrames: 120, background: '#f4efe4', export: { loudness: -16 } };
+export default function Video() { return <AbsoluteFill style={{ fontFamily: 'Inter, sans-serif', color: '#1b1b1b' }}>${body}</AbsoluteFill>; }
+`;
+  const project = async (name: string, body: string) => { const root = join(dir, name); await mkdir(root, { recursive: true }); await writeFile(join(root, 'video.tsx'), film(body)); return join(root, 'video.tsx'); };
+
+  it('notes a picture that uses only a small part of the usable height', async () => {
+    const result = await makeVideo({ file: await project('sparse', `<div style={{ position: 'absolute', left: 40, top: 200, fontSize: 56, fontWeight: 700, lineHeight: 1.2 }}>A small title</div>`), every: 15 });
+    expect(makeReport(result)).toMatch(/note .*fills only about \d+% of the usable height/);
+  }, 240_000);
+
+  it('is quiet about a picture that fills it', async () => {
+    const body = `<div style={{ position: 'absolute', left: 40, top: 100, fontSize: 64, fontWeight: 700, lineHeight: 1.2 }}>A title that opens the frame</div><div style={{ position: 'absolute', left: 40, top: 400, width: 460, height: 340, background: '#c8402b' }} /><div style={{ position: 'absolute', left: 40, top: 760, fontSize: 56, fontWeight: 700, lineHeight: 1.2 }}>and a closing line</div>`;
+    const result = await makeVideo({ file: await project('full', body), every: 15 });
+    expect(makeReport(result)).not.toMatch(/fills only about/);
+  }, 240_000);
+});

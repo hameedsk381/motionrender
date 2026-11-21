@@ -139,6 +139,21 @@ export async function reviewComposition(composition: Composition, options: Revie
   // Motion: stretches where the picture does not change (a closing hold may run longer: 6 s rather than 4) (mean change below half a grey level between samples).
   const change=reports.slice(1).map((r, i) => { const a=reports[i]!.thumb.pixels, b=r.thumb.pixels; let sum=0; for (let k=0; k < a.length; k++) sum+=Math.abs(a[k]!-b[k]!); return sum/a.length; });
   let still=-1; for (let i=0; i <= change.length; i++) { const isStill=i < change.length && change[i]! < 0.5; if (isStill && still < 0) still=i; if (!isStill && still >= 0) { const from=frames[still]!, to=frames[i]!; if (to-from >= (to >= durationFrames-1 ? 6 : 4)*fps) issues.push({ severity: 'warning', code: 'frozen', message: `Nothing moves from ${seconds(from, fps)} to ${seconds(to, fps)}: add slow drift or a beat, or shorten the hold`, frame: from, suggestion: { from, to } }); still=-1; } }
+  // Composition: the picture should use the room it has. Against a plain ground, find the rows that hold anything and see how much of the usable height
+  // (inside the platform bands) they cover; a video that fills a third of it in most frames looks empty however good its parts are.
+  {
+    const usable = web ? 1 : 0.82 - 0.08, covered: number[] = [];
+    for (const report of reports) {
+      const { width: w, height: h, pixels } = report.thumb, corners = [pixels[0]!, pixels[w - 1]!, pixels[(h - 1) * w]!, pixels[h * w - 1]!].sort((a, b) => a - b), ground = (corners[1]! + corners[2]!) / 2;
+      if (pixels.filter(v => Math.abs(v - ground) <= 10).length / pixels.length < 0.55) continue;   // a photo or a busy ground: nothing to measure against
+      let first = -1, last = -1;
+      for (let y = 0; y < h; y++) { let n = 0; for (let x = 0; x < w; x++) if (Math.abs(pixels[y * w + x]! - ground) > 14) n++; if (n / w >= 0.03) { if (first < 0) first = y; last = y; } }
+      if (first >= 0) covered.push(((last - first + 1) / h) / usable);
+    }
+    covered.sort((a, b) => a - b);
+    const median = covered[Math.floor(covered.length / 2)];
+    if (covered.length >= 4 && median !== undefined && median < 0.5) issues.push({ severity: 'info', code: 'empty-frame', message: `The picture fills only about ${Math.round(median * 100)}% of the usable height in most frames: scale it up, or give it more to show, so the frame does not look empty` });
+  }
   // Rhythm and transitions across scenes.
   // The overlay scene (persistent layers) is as long as the video and is no part of its rhythm or its cuts.
   const content=composition.scenes.filter(s => s.id !== 'overlay');
