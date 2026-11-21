@@ -29,7 +29,7 @@
     "eval:ai": "tsx scripts/eval-briefs.ts"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.6",
+    "@biomejs/biome": "^2.6.7",
     "@ove/ai": "workspace:*",
     "@ove/animation": "workspace:*",
     "@ove/api": "workspace:*",
@@ -50,10 +50,10 @@
     "@types/react": "19",
     "@types/react-dom": "19",
     "esbuild": "^0.28.2",
-    "playwright": "1.64.1",
+    "playwright": "1.65.1",
     "react": "19",
     "react-dom": "19",
-    "three": "0.170.0",
+    "three": "0.187.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^4.1.12"
