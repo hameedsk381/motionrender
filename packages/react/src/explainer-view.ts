@@ -266,6 +266,12 @@ function quote(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement 
 }
 
 /* ---- title: a poster (flush left, one line large) or a centred card ---- */
+/** The largest size, up to `size`, at which `text` fits in `width`: wide faces (Syne) and capitals take more room per letter, so a long word is shrunk, never clipped. */
+function fitSize(ctx: Ctx, text: string, size: number, width: number): number {
+  const upper = (text.match(/[A-Z0-9]/g)?.length ?? 0) / Math.max(1, text.length), wide = col(ctx, 'fontDisplay') === 'Syne' ? 1.45 : 1;
+  const perEm = (0.5 + 0.3 * upper) * wide * (text.length + 1) * 0.98;
+  return Math.max(56, Math.min(size, Math.floor(width / perEm)));
+}
 function title(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement {
   const lines = s.lines as string[], big = typeof s.highlight === 'number' ? s.highlight : lines.length === 3 ? 1 : 0;
   const pick = variant !== 'auto' ? variant : lines.length >= 3 || lines.some(l => l.length > 22) ? 'poster' : 'centred';
@@ -274,7 +280,7 @@ function title(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement 
     s.brand ? h('div', { key: 'brand', style: { ...display(ctx, 900), fontSize: pick === 'poster' ? 150 : 120, lineHeight: 1, alignSelf: align, textAlign: ta, ...arrive(ctx, 2, 26) } }, s.brand) : null,
     s.chip ? h(Badge, { key: 'chip', dot: false, delay: 10, style: { alignSelf: align, background: 'transparent', border: `3px solid ${col(ctx, 'accent')}`, color: col(ctx, 'accent'), ...mono(ctx), fontSize: 24, padding: '8px 20px', borderRadius: radius(ctx, 10) } }, s.chip) : null,
     h('div', { key: 'lines', style: { alignSelf: align, textAlign: ta, display: 'flex', flexDirection: 'column', gap: 12, borderLeft: pick === 'poster' ? `8px solid ${col(ctx, 'accent')}` : 'none', paddingLeft: pick === 'poster' ? 30 : 0 } },
-      ...lines.map((line, k) => h('div', { key: k, style: { ...display(ctx, k === big ? 900 : 700), fontSize: k === big ? (pick === 'poster' ? 112 : 96) : 54, lineHeight: 1.08, color: k === big ? col(ctx, 'accent') : col(ctx, 'text')} }, h(KineticText, { text: line, delay: 14 + k * 10, staggerDelay: 3, preset: 'snappy', style: { justifyContent: ta === 'center' ? 'center' : 'flex-start' } }))))], 40);
+      ...lines.map((line, k) => h('div', { key: k, style: { ...display(ctx, k === big ? 900 : 700), fontSize: k === big ? fitSize(ctx, line, pick === 'poster' ? 112 : 96, W - 120 - (pick === 'poster' ? 38 : 0)) : 54, lineHeight: 1.08, color: k === big ? col(ctx, 'accent') : col(ctx, 'text')} }, h(KineticText, { text: line, delay: 14 + k * 10, staggerDelay: 3, preset: 'snappy', style: { justifyContent: ta === 'center' ? 'center' : 'flex-start' } }))))], 40);
 }
 
 /* ---- closing: the takeaway with its reminders and a call to action, or a bare poster line ---- */
