@@ -10,7 +10,7 @@ import { missingMedia, readExplainer, wavSeconds } from '../../packages/cli/src/
 // An explainer script is what a person or an AI writes: scenes and spoken lines. It must compile to a valid, readable composition for any
 // topic, with the same header on every scene, and each scene as long as its line.
 const example = (name: string) => JSON.parse(readFileSync(new URL(`../../examples/${name}/spec.json`, import.meta.url), 'utf8'));
-const parse = (raw: unknown): Explainer => explainerSchema.parse(raw);
+const parse = (raw: unknown): Explainer => explainerSchema.parse({ look: 'navy', ...(raw as object) });
 const wav = (seconds: number, rate = 24000) => {
   const data = rate * 2 * seconds, bytes = new Uint8Array(44 + data), view = new DataView(bytes.buffer);
   bytes.set([...'RIFF'].map(c => c.charCodeAt(0)), 0); view.setUint32(4, 36 + data, true); bytes.set([...'WAVEfmt '].map(c => c.charCodeAt(0)), 8);

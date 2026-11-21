@@ -1,6 +1,7 @@
 // Turns an explainer script (the scenes and what is said over them) into a composition. Each scene kind draws one kind of small animated
 // diagram on the same dark board, with the same header and footer on every scene, so any topic gets a consistent video. Nothing here
 // runs while rendering: the result is plain composition JSON, frame-exact like any other.
+import { autoLook } from './explainer-auto-look';
 import { directScenes } from './explainer-direction';
 import { foldLayers, foldClosed } from './fold-layers';
 import { splitLayers, splitArrival } from './split-layers';
@@ -557,7 +558,7 @@ function reactCues(scene: ExplainerScene, frames: number): Layer[] {
 export function compileExplainer(input: Explainer, options: CompileOptions = {}): ExplainerCompiled {
   const spec: Explainer = { ...input, scenes: directScenes(input) };
   // The look is a whole design; the script's `design` and `colors` change parts of it.
-  const def = explainerLookDefs[spec.look];
+  const def = spec.look === 'auto' ? autoLook(spec).def : explainerLookDefs[spec.look];
   const chosen = { ...def.design, ...Object.fromEntries(Object.entries(spec.design ?? {}).filter(([, value]) => value !== undefined)) } as typeof def.design;
   const palette: Record<string, string | number> = { ...def.colors, ...spec.colors, fontDisplay: chosen.fontDisplay, fontBody: chosen.fontBody, texture: chosen.texture, transition: chosen.transition };
   active = { motion: chosen.motion, cornerScale: explainerCornerScale[chosen.corners], weightCap: explainerWeightValue[chosen.weight], fonts: { '{{fontDisplay}}': chosen.fontDisplay, '{{fontBody}}': chosen.fontBody }, layout: chosen.layout, header: chosen.header, progress: chosen.progress, captions: chosen.captions };

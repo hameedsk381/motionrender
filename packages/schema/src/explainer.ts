@@ -173,7 +173,7 @@ export const explainerSchema = z.object({
   captions: z.boolean().default(true).describe('Spoken words drawn as captions near the bottom, the word being said highlighted. Needs the voice: a silent build has none.'),
   chapters: z.boolean().default(true).describe('A segmented progress bar and a "03 / 07" count, so the viewer always knows where they are'),
   sketch: z.boolean().default(false).describe('Draw the whole board by hand: wobbly outlines, redrawn every few frames like a cartoon'),
-  look: z.enum(explainerLooks).default('navy').describe(`The whole design of the board. Choose the one that suits the subject, not the default: ${explainerLooks.map(name => `${name} (${explainerLookDefs[name].note})`).join('; ')}`),
+  look: z.enum([...explainerLooks, 'auto']).default('auto').describe(`The whole design of the board. "auto" (the default) makes one from the subject: the family of design its words point to, turned to its own colours, type, texture, motion and frame. Or name one of the fixed looks, the one that suits the subject: ${explainerLooks.map(name => `${name} (${explainerLookDefs[name].note})`).join('; ')}`),
   design: z.object({
     fontDisplay: z.enum(explainerDisplayFonts).optional().describe('Headline font'), fontBody: z.enum(explainerBodyFonts).optional().describe('Body font'),
     motion: z.enum(explainerMotions).optional().describe('How text arrives: rise, drop (from above), blur (comes into focus) or fade'), transition: z.enum(explainerTransitions).optional().describe('How scenes change'),

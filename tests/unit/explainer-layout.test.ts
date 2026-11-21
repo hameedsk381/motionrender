@@ -5,7 +5,7 @@ import { compileExplainer } from '@ove/core';
 // Scenes are drawn from the top of a 1080x1920 column. The compiler centres each scene's content between the header and the lower band that
 // reel apps cover, and a scene may choose its own layout, so the video is neither top-heavy nor one template from start to end.
 const steps = { kind: 'steps', items: [{ title: 'One', detail: 'first' }, { title: 'Two', detail: 'second' }] };
-const compile = (scenes: unknown[], extra: Record<string, unknown> = {}) => compileExplainer(explainerSchema.parse({ topic: 'T', scenes, ...extra })).composition as any;
+const compile = (scenes: unknown[], extra: Record<string, unknown> = {}) => compileExplainer(explainerSchema.parse({ topic: 'T', look: 'navy', scenes, ...extra })).composition as any;
 const layer = (composition: any, scene: number, id: string) => composition.scenes[scene].layers.find((item: any) => item.id === id);
 
 describe('explainer vertical placement', () => {
@@ -109,7 +109,7 @@ describe('explainer captions and chapter bar', () => {
   const words = [{ text: 'Hash', start: 0, end: 0.4 }, { text: 'the', start: 0.4, end: 0.6 }, { text: 'key.', start: 0.6, end: 1.1 }, { text: 'Pick', start: 1.2, end: 1.6 }, { text: 'a', start: 1.6, end: 1.7 }, { text: 'slot.', start: 1.7, end: 2.3 }];
   const spoken = { src: 'assets/voice-1.wav', seconds: 2.5, words };
   const build = (extra: Record<string, unknown> = {}, audio: any[] = [spoken, spoken]) =>
-    compileExplainer(explainerSchema.parse({ topic: 'T', scenes: [{ ...steps, caption: 'A line.', say: 'x' }, { ...steps, say: 'y' }], ...extra }), { audio }).composition as any;
+    compileExplainer(explainerSchema.parse({ topic: 'T', look: 'navy', scenes: [{ ...steps, caption: 'A line.', say: 'x' }, { ...steps, say: 'y' }], ...extra }), { audio }).composition as any;
 
   it('draws the spoken words as captions timed to the real speech, with the word being said picked out', () => {
     const captions = layer(build(), 0, 'captions');
@@ -152,7 +152,7 @@ describe('explainer captions and chapter bar', () => {
 describe('explainer music bed and source cards', () => {
   const words = [{ text: 'Hello', start: 0, end: 0.5 }];
   const voiced = [{ src: 'assets/voice-1.wav', seconds: 2, words }];
-  const build = (extra: Record<string, unknown> = {}, audio: any[] = voiced) => compileExplainer(explainerSchema.parse({ topic: 'T', scenes: [{ ...steps, say: 'x' }], ...extra }), { audio }).composition as any;
+  const build = (extra: Record<string, unknown> = {}, audio: any[] = voiced) => compileExplainer(explainerSchema.parse({ topic: 'T', look: 'navy', scenes: [{ ...steps, say: 'x' }], ...extra }), { audio }).composition as any;
 
   it('puts a quiet bed under a voiced video and lowers it while anything speaks', () => {
     const exported = build().export;
@@ -167,7 +167,7 @@ describe('explainer music bed and source cards', () => {
   });
 
   it('draws a source card with the source, the words and a stamp, and keeps it in the usable band', () => {
-    const composition = compileExplainer(explainerSchema.parse({ topic: 'T', scenes: [{ kind: 'quote', text: 'Our pilot cut delivery times by a third.', source: 'Example Logistics Ltd', byline: 'Annual report', date: '2026', stamp: { text: 'CLAIM', tone: 'red' }, caption: 'A claim.' }] })).composition as any;
+    const composition = compileExplainer(explainerSchema.parse({ topic: 'T', look: 'navy', scenes: [{ kind: 'quote', text: 'Our pilot cut delivery times by a third.', source: 'Example Logistics Ltd', byline: 'Annual report', date: '2026', stamp: { text: 'CLAIM', tone: 'red' }, caption: 'A claim.' }] })).composition as any;
     const find = (id: string) => composition.scenes[0].layers.find((item: any) => item.id === id);
     expect(find('quote-source').content).toBe('Example Logistics Ltd');
     expect(find('quote-meta').content).toBe('Annual report · 2026');
@@ -182,7 +182,7 @@ describe('explainer closing keeps its points below a long title', () => {
   const closing = { kind: 'closing', title: 'A hash table trades space for speed', points: ['Hash the key to a slot', 'Jump instead of search', 'Handle collisions calmly'], cta: 'Next: how caches use them' };
   for (const layout of ['card', 'editorial']) {
     it(`in the ${layout} layout`, () => {
-      const scene = compileExplainer(explainerSchema.parse({ topic: 'T', scenes: [{ ...closing, layout }], design: { layout } }), { audio: [] }).composition as any;
+      const scene = compileExplainer(explainerSchema.parse({ topic: 'T', look: 'navy', scenes: [{ ...closing, layout }], design: { layout } }), { audio: [] }).composition as any;
       const find = (id: string) => scene.scenes[0].layers.find((item: any) => item.id === id);
       const title = find('close-title'), first = find('close-point-0'), last = find('close-point-2'), cta = find(layout === 'card' ? 'cta-box' : 'cta-url');
       // Three lines of the title's size must end above the first point, and the call to action must sit below the last one.

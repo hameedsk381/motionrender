@@ -6,7 +6,7 @@ import { explainerPrompt, writeExplainer, type AiProvider } from '@ove/ai';
 // A look is a whole design: colours, type, motion, texture, corners and weight. Models choose it per subject, a script can change parts of it,
 // and a reply that chose nothing still gets a look that depends on its topic, so videos about different things do not all come out alike.
 const scenes = [{ kind: 'title', lines: ['What is', 'A CACHE', 'really?'], say: 'x' }, { kind: 'stat', value: '87%', label: 'of reads', note: 'a week' }];
-const make = (extra: Record<string, unknown> = {}) => { const spec = explainerSchema.parse({ topic: 'CACHES', scenes, ...extra }); return compileExplainer(spec).composition as any; };
+const make = (extra: Record<string, unknown> = {}) => { const spec = explainerSchema.parse({ topic: 'CACHES', scenes, look: 'navy', ...extra }); return compileExplainer(spec).composition as any; };
 const allLayers = (c: any): any[] => c.scenes.flatMap((scene: any) => scene.layers);
 
 const luminance = (hex: string) => { const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!; };
@@ -118,10 +118,10 @@ describe('choosing a look for a topic', () => {
     expect(used.size).toBe(13);
   });
 
-  it('is used when the model chose no look, and never replaces one it chose', async () => {
+  it('is made from the subject when the model chose no look, and never replaces one it chose', async () => {
     const provider = (reply: unknown) => ({ id: 'fake', model: 'fake', chat: async () => JSON.stringify(reply) }) as unknown as AiProvider;
     const body = { topic: 'HOW BREAD RISES', scenes: [{ kind: 'title', lines: ['A'] }] };
-    expect((await writeExplainer(provider(body), 'bread')).explainer.look).toBe(lookForTopic('HOW BREAD RISES'));
+    expect((await writeExplainer(provider(body), 'bread')).explainer.look).toBe('auto');
     expect((await writeExplainer(provider({ ...body, look: 'sage' }), 'bread')).explainer.look).toBe('sage');
     expect((await writeExplainer(provider({ ...body, look: 'terminal', design: { corners: 'round' } }), 'bread')).explainer.design).toEqual({ corners: 'round' });
   });

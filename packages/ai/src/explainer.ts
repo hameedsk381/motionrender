@@ -2,7 +2,7 @@
 // answer is checked against the explainer schema. A reply that does not fit is sent back with the exact problems, a few times at most.
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
-import { explainerBodyFonts, explainerDisplayFonts, explainerLookDefs, explainerLooks, explainerSchema, lookForTopic, type Explainer } from '@ove/schema';
+import { explainerBodyFonts, explainerDisplayFonts, explainerLookDefs, explainerLooks, explainerSchema, type Explainer } from '@ove/schema';
 import { synthesizeEdgeSpeech } from './edge-tts';
 import { extractJson } from './json';
 import type { Fact } from './facts';
@@ -126,8 +126,6 @@ export async function writeExplainer(provider: AiProvider, brief: string, option
     const reply = await provider.chat(messages, { signal: options.signal });
     try {
       const raw = extractJson(reply) as Record<string, unknown> | null;
-      // A reply with no look at all would come out in the default one every time: give it the look its topic maps to, so videos still differ.
-      if (raw && typeof raw === 'object' && raw.look === undefined) raw.look = lookForTopic(typeof raw.topic === 'string' ? raw.topic : brief);
       const parsed = explainerSchema.safeParse(raw);
       if (parsed.success) {
         const structure = structureProblems(parsed.data, options.avoid);
