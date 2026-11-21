@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -34,6 +34,15 @@ describe('a video source', () => {
     const { writeFileSync } = await import('node:fs');
     writeFileSync(join(dir, 'video.tsx'), 'export default function Video() { return <div>; }\n');
     await expect(buildVideoSource(join(dir, 'video.tsx'))).rejects.toThrow();
+  }, 60000);
+});
+
+describe('assets a video declares', () => {
+  it('fails the build, naming the file, when a declared asset is not in the project', async () => {
+    await initProject(join(dir, 's'), { react: true, skill: false });
+    const source = join(dir, 's', 'video.tsx'), code = readFileSync(source, 'utf8');
+    writeFileSync(source, code.replace(/export const config = \{/, "export const config = { assets: [{ id: 'panels', type: 'image', src: 'assets/missing.jpg' }],"));
+    await expect(buildVideoSource(source)).rejects.toThrow(/config\.assets names files that are not in the project: panels \(assets\/missing\.jpg\)/);
   }, 60000);
 });
 

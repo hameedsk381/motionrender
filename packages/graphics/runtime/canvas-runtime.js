@@ -172,7 +172,7 @@ async function prepareHtml(ops){for(const op of ops){if(op.kind==='group'){await
     try{const img=new Image();img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(await htmlSvg(op));await img.decode();htmlImages.set(op.htmlKey,img)}
     catch(e){const err=new Error('Layer "'+l.id+'" (html): could not be drawn ('+(e&&e.message||'the markup or CSS may be malformed')+')');err.oveLayer=true;throw err}
     while(htmlImages.size>48)htmlImages.delete(htmlImages.keys().next().value)}}
-function drawHtml(op){const img=htmlImages.get(op.htmlKey);if(img)ctx.drawImage(img,0,0,op.layer.width,op.layer.height);if(notes&&op.domTexts)for(const t of op.domTexts)note(op,t.x,t.y,t.w,t.h,t.size,{id:op.layer.id+'/dom-'+t.key,kind:'text',text:t.text.slice(0,60),words:t.words,baseSize:t.size,color:t.color,alpha:t.alpha*ctx.globalAlpha*noteAlpha,truncated:false,shrunk:false,clipped:t.clipped,contrast:t.contrast,occluded:t.occluded})}
+function drawHtml(op){const img=htmlImages.get(op.htmlKey);if(img)ctx.drawImage(img,0,0,op.layer.width,op.layer.height);if(notes&&op.domTexts)for(const t of op.domTexts)note(op,t.x,t.y,t.w,t.h,t.size,{id:op.layer.id+'/dom-'+t.key,kind:'text',text:t.text.slice(0,60),words:t.words,baseSize:t.size,color:t.color,alpha:t.alpha*ctx.globalAlpha*noteAlpha,truncated:false,shrunk:false,clipped:t.clipped,contrast:t.contrast,occluded:t.occluded});if(notes&&op.domImages)for(const t of op.domImages)note(op,t.x,t.y,t.w,t.h,0,{id:op.layer.id+'/img-'+t.key,kind:'image',text:t.src,words:0,baseSize:0,color:'',alpha:1,truncated:false,shrunk:false,broken:true})}
 // Lottie layers: each layer gets its own lottie-web animation, drawn by the light canvas player into an offscreen canvas of the
 // layer's size, seeked to the exact frame (fractional frames too, for motion blur), then drawn like a picture. Animation data is
 // given by src (the renderer passes parsed JSON, the Player URLs, fetched once).
@@ -221,6 +221,10 @@ function inspectLiveText(box){const root=box.getBoundingClientRect(),walker=docu
     const colour=el instanceof SVGElement?css.fill:css.color;
     items.push({key,text,words:text.split(/\s+/).length,x:rect.left-root.left,y:rect.top-root.top,w:rect.width,h:rect.height,size:parseFloat(css.fontSize),alpha,color:colour,clipped,contrast:alpha>=.99?liveContrast(el,box,colour):undefined,occluded:liveOccluded(el,box,rect)});
   }return items}
+// A picture the component names that the project does not hold (not declared in config.assets, and not an address that loads) renders as nothing and nothing else says so: report each one.
+async function inspectLiveImages(box){const root=box.getBoundingClientRect(),found=[];let serial=0;const all=[...box.querySelectorAll('img')];
+  await Promise.all(all.map(el=>el.decode?el.decode().catch(()=>{}):0));
+  for(const el of all){const src=el.getAttribute('src')||'';if(!src||/^(data|blob):/.test(src)||imageUrls.has(src))continue;if(el.complete&&el.naturalWidth>0)continue;const rect=el.getBoundingClientRect();found.push({key:serial++,src:src.slice(0,80),x:rect.left-root.left,y:rect.top-root.top,w:rect.width||1,h:rect.height||1})}return found}
 // Web fonts and pictures a stylesheet names by address are fetched and written in as data (an image drawn from markup loads nothing itself); the
 // result is kept per stylesheet text. A stylesheet the page may not read rule by rule (another origin) is fetched as text instead.
 const liveInlined=new Map();
@@ -237,7 +241,7 @@ async function liveSnapshot(entry,op){const l=op.layer,v=op.vars||{};let host=li
   from.forEach((canvas,i)=>{const rect=canvas.getBoundingClientRect(),img=document.createElement('img');img.setAttribute('src',canvas.toDataURL('image/png'));
     const style=canvas.getAttribute('style')||'';img.setAttribute('style',style+(/(^|;)\s*width\s*:/.test(style)?'':';width:'+rect.width+'px')+(/(^|;)\s*height\s*:/.test(style)?'':';height:'+rect.height+'px'));
     if(canvas.className)img.className=canvas.className;to[i].replaceWith(img)});
-  return{html:clone.innerHTML,css:await liveCss(),texts:op.audit?inspectLiveText(box):undefined}}
+  return{html:clone.innerHTML,css:await liveCss(),texts:op.audit?inspectLiveText(box):undefined,images:op.audit?await inspectLiveImages(box):undefined}}
 async function prepareReact(ops){for(const op of ops){if(op.kind==='group'){await prepareReact(op.children||[]);continue}if(op.kind!=='react')continue;const l=op.layer;
     try{let entry=reactEntries.get(l.src);if(!entry){const given=codeSources[l.src];if(!given)throw new Error('the bundle '+l.src+' was not loaded');
         const text=typeof given.text==='string'?given.text:await fetch(given.url).then(r=>{if(!r.ok)throw new Error('could not load '+given.url);return r.text()});
@@ -246,7 +250,7 @@ async function prepareReact(ops){for(const op of ops){if(op.kind==='group'){awai
         if(typeof entry.render!=='function'&&typeof entry.mount!=='function')throw new Error('the bundle did not register a component; rebuild it with ove build');reactEntries.set(l.src,entry)}
       const v=op.vars||{};let html,css='',cacheKey;
       if(entry.mount){cacheKey=JSON.stringify(['live',l.src,l.id,Number(v['--frame'])||0,l.props||{},l.width,l.height,l.resolution]);
-        if(htmlImages.has(cacheKey)&&!op.audit)html='';else{const made=await liveSnapshot(entry,op);html=made.html;css=made.css;op.domTexts=made.texts}}
+        if(htmlImages.has(cacheKey)&&!op.audit)html='';else{const made=await liveSnapshot(entry,op);html=made.html;css=made.css;op.domTexts=made.texts;op.domImages=made.images}}
       else{html=entry.render({frame:Number(v['--frame'])||0,fps:Number(v['--fps'])||30,width:l.width,height:l.height,durationInFrames:l.durationInFrames,props:l.props||{}});if(typeof html!=='string')throw new Error('the component did not render to markup')}
       op.kind='html';op.layer=Object.assign({},l,{type:'html',html,css,vars:{},resolution:l.resolution||1,cacheKey});op.vars={}}
     catch(e){const err=new Error('Layer "'+l.id+'" (react): '+(e&&e.message||e));err.oveLayer=true;throw err}}}

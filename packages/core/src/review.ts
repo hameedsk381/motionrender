@@ -96,6 +96,10 @@ export async function reviewComposition(composition: Composition, options: Revie
   let reports: FrameReport[]=[], sheet: Buffer; try { let done=0; reports=await Promise.all(frames.map(f => renderer.inspectFrame(f).then(r => { options.onProgress?.(++done, frames.length); return r; })));
     sheet=await renderer.contactSheet(sheetFrames, { columns: options.columns ?? (width >= height ? 4 : 6), safeBands }); } finally { await renderer.close(); }
   const issues: ReviewIssue[]=[], minSide=Math.min(width, height);
+  // A picture that did not load renders as nothing and the picture is simply missing from the video: say so, once per picture, then keep these notes out of the text checks.
+  const missingPictures = new Set<string>();
+  reports.forEach((report, i) => { for (const t of report.texts) if (t.kind === 'image' && t.broken && !missingPictures.has(t.text)) { missingPictures.add(t.text); issues.push({ severity: 'error', code: 'image-missing', message: `The picture "${t.text}" did not load, so it renders as nothing: declare it in config.assets and use it by its id (mr stock prints the entry), or fix its path`, frame: frames[i]!, layer: t.id }); } });
+  reports = reports.map(report => ({ ...report, texts: report.texts.filter(t => t.kind !== 'image') }));
   // Problems that last: a layer reported once per kind, at the first sampled frame, and only when it holds for at least `hold` samples
   // in a row (so things sliding in from off-frame, or crossing during a transition, are not flagged).
   const persistent=(code: string, hold: number, test: (t: TextNote, report: FrameReport) => string | undefined, severity: ReviewIssue['severity']) => { const runs=new Map<string, { start: number; count: number; message: string }>(), reported=new Set<string>();
