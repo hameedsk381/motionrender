@@ -22,7 +22,7 @@ const common = {
 };
 
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'A colour is a 6-digit hex such as #0b1c3f');
-import { explainerBodyFonts, explainerCorners, explainerDisplayFonts, explainerLayouts, explainerLookDefs, explainerLooks, explainerMotions, explainerTextures, explainerTransitions, explainerWeights } from './explainer-looks';
+import { explainerBodyFonts, explainerCaptionStyles, explainerCorners, explainerDisplayFonts, explainerHeaders, explainerLayouts, explainerLookDefs, explainerLooks, explainerMotions, explainerProgress, explainerTextures, explainerTransitions, explainerWeights } from './explainer-looks';
 /** The looks an explainer can wear: each is a whole design (colours, type, motion, texture, corners, weight); see explainer-looks. */
 export { explainerLooks };
 
@@ -179,6 +179,9 @@ export const explainerSchema = z.object({
     motion: z.enum(explainerMotions).optional().describe('How text arrives: rise, drop (from above), blur (comes into focus) or fade'), transition: z.enum(explainerTransitions).optional().describe('How scenes change'),
     texture: z.enum(explainerTextures).optional().describe('The pattern behind everything'), corners: z.enum(explainerCorners).optional().describe('How round the cards are'), weight: z.enum(explainerWeights).optional().describe('How heavy the headlines are'),
     layout: z.enum(explainerLayouts).optional().describe('card: centred, in boxed cards. editorial: flush left, no boxes, hairline rules, large numerals (title, stat, steps and closing scenes)'),
+    header: z.enum(explainerHeaders).optional().describe('The header: strip (series · topic · handle), rule (topic over a hairline), stamp (topic on a filled tag) or minimal (topic only)'),
+    progress: z.enum(explainerProgress).optional().describe('Where the viewer is: segments (a bar per scene), line (one thin bar), dots or count (the number only)'),
+    captions: z.enum(explainerCaptionStyles).optional().describe('The spoken-word captions: center, left (flush left) or box (on a panel)'),
   }).optional().describe('Changes parts of the look: any field left out keeps the look\'s own'),
   colors: z.object({ bg: hex, surface: hex, text: hex, muted: hex, accent: hex, accent2: hex }).partial().optional().describe('Colours that replace the look\'s own, by name'),
   treatment: treatmentSchema.optional().describe('The shape chosen for this video and the shapes passed over; written before the scenes'),

@@ -256,12 +256,12 @@ function drawLayer(layer: Layer, frame: number, key: string | number, assets: Ma
     let cue = cues.find(c => t >= c.start && t < c.end), finished = false;
     if (!cue) { cue = [...cues].reverse().find(c => c.end <= t && t - c.end < 0.3); finished = !!cue; }
     if (!cue) return null;
-    const words = cue.words?.length && layer.mode !== 'lines' ? cue.words : cue.text.split(/s+/).filter(Boolean).map(text => ({ text, start: 0, end: 0 }));
+    const words = cue.words?.length && layer.mode !== 'lines' ? cue.words : cue.text.split(/\s+/).filter(Boolean).map(text => ({ text, start: 0, end: 0 }));
     const current = cue.words?.length && layer.mode !== 'lines' ? (finished ? words.length : words.reduce((at, word, i) => (word.start <= t ? i : at), -1)) : words.length;
-    const boxWidth = num(layer.maxWidth, 900), size = num(layer.fontSize, 54);
-    content = createElement('div', { style: { position: 'absolute', left: 0, top: 0, width: boxWidth, transform: `translateX(${-boxWidth / 2}px)`, textAlign: 'center', fontFamily: fontStack(layer.fontFamily), fontSize: size, fontWeight: layer.fontWeight ?? 700, lineHeight: 1.2 } },
+    const boxWidth = num(layer.maxWidth, 900), size = num(layer.fontSize, 54), panel = typeof layer.background === 'string' && layer.background !== 'transparent', pad = panel ? num(layer.padding, 18) : 0;
+    content = createElement('div', { style: { position: 'absolute', left: 0, top: 0, width: boxWidth, transform: `translateX(${-boxWidth / 2}px)`, boxSizing: 'border-box', textAlign: layer.textAlign ?? 'center', fontFamily: fontStack(layer.fontFamily), fontSize: size, fontWeight: layer.fontWeight ?? 700, lineHeight: 1.2, ...(panel ? { background: layer.background, padding: pad, borderRadius: num(layer.radius, 14) } : {}) } },
       words.map((word, i) => createElement('span', { key: i, style: { color: i < current ? layer.color ?? '#ffffff' : i === current ? layer.highlightColor ?? layer.color ?? '#ffffff' : layer.upcomingColor ?? layer.color ?? '#ffffff' } }, (i ? ' ' : '') + word.text)));
-    w = boxWidth; h = size * 1.2;
+    w = boxWidth; h = size * 1.2 + pad * 2;
   } else if (layer.type === 'text') {
     const size = num(valueOf(layer, 'fontSize', local), 48), align = layer.textAlign ?? 'left';
     const textWidth = layer.maxWidth ? num(layer.maxWidth, 0) : undefined;

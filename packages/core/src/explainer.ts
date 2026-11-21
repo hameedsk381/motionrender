@@ -22,8 +22,8 @@ const GOLD = '{{accent}}', MINT = '{{accent2}}', RED = '#ff5d6c', ORANGE = '#e8a
 const TONES = { gold: GOLD, mint: MINT, red: RED, muted: '{{muted}}' } as const;
 
 /* ---- the design in force while one script compiles ---- */
-type Active = { motion: 'rise' | 'drop' | 'blur' | 'fade'; cornerScale: number; weightCap: number; fonts: Record<string, string>; layout: 'card' | 'editorial' };
-const NEUTRAL: Active = { motion: 'rise', cornerScale: 1, weightCap: 900, fonts: { '{{fontDisplay}}': 'Archivo', '{{fontBody}}': 'Inter' }, layout: 'card' };
+type Active = { motion: 'rise' | 'drop' | 'blur' | 'fade'; cornerScale: number; weightCap: number; fonts: Record<string, string>; layout: 'card' | 'editorial'; header: 'strip' | 'rule' | 'stamp' | 'minimal'; progress: 'segments' | 'line' | 'dots' | 'count'; captions: 'center' | 'left' | 'box' };
+const NEUTRAL: Active = { motion: 'rise', cornerScale: 1, weightCap: 900, fonts: { '{{fontDisplay}}': 'Archivo', '{{fontBody}}': 'Inter' }, layout: 'card', header: 'strip', progress: 'segments', captions: 'center' };
 let active: Active = NEUTRAL;
 /** A corner radius in this design: the cards' own numbers are for the default soft corners. */
 const R = (radius: number) => Math.round(radius * active.cornerScale);
@@ -558,7 +558,7 @@ export function compileExplainer(spec: Explainer, options: CompileOptions = {}):
   const def = explainerLookDefs[spec.look];
   const chosen = { ...def.design, ...Object.fromEntries(Object.entries(spec.design ?? {}).filter(([, value]) => value !== undefined)) } as typeof def.design;
   const palette: Record<string, string | number> = { ...def.colors, ...spec.colors, fontDisplay: chosen.fontDisplay, fontBody: chosen.fontBody, texture: chosen.texture, transition: chosen.transition };
-  active = { motion: chosen.motion, cornerScale: explainerCornerScale[chosen.corners], weightCap: explainerWeightValue[chosen.weight], fonts: { '{{fontDisplay}}': chosen.fontDisplay, '{{fontBody}}': chosen.fontBody }, layout: chosen.layout };
+  active = { motion: chosen.motion, cornerScale: explainerCornerScale[chosen.corners], weightCap: explainerWeightValue[chosen.weight], fonts: { '{{fontDisplay}}': chosen.fontDisplay, '{{fontBody}}': chosen.fontBody }, layout: chosen.layout, header: chosen.header, progress: chosen.progress, captions: chosen.captions };
   try { return compileWith(spec, options, palette); } finally { active = NEUTRAL; }
 }
 
@@ -588,18 +588,32 @@ function contentExtent(layers: Layer[]): { top: number; bottom: number } | undef
 /** The spoken words, near the bottom and above the band reel apps cover; the word being said is picked out in the signal colour. */
 const CAPTIONS_Y = 1380;
 const captionsLayer = (cues: CaptionCue[]): Layer => ({
-  id: 'captions', type: 'captions', src: 'spoken', cues, mode: 'words', maxWords: 6, startFrame: 8, x: W / 2, y: CAPTIONS_Y, textAlign: 'center', maxWidth: 920, fontSize: 54,
-  fontFamily: '{{fontDisplay}}', fontWeight: weightFor('{{fontDisplay}}', 800), color: '{{text}}', highlightColor: GOLD, upcomingColor: '{{muted}}', background: 'transparent', padding: 0, dropFillers: false,
+  id: 'captions', type: 'captions', src: 'spoken', cues, mode: 'words', maxWords: 6, startFrame: 8, x: active.captions === 'left' ? 60 + 450 : W / 2, y: active.captions === 'box' ? CAPTIONS_Y - 28 : CAPTIONS_Y, textAlign: active.captions === 'left' ? 'left' : 'center', maxWidth: active.captions === 'left' ? 900 : active.captions === 'box' ? 880 : 920, radius: 20, fontSize: active.captions === 'box' ? 48 : 54,
+  fontFamily: '{{fontDisplay}}', fontWeight: weightFor('{{fontDisplay}}', 800), color: '{{text}}', highlightColor: GOLD, upcomingColor: '{{muted}}', background: active.captions === 'box' ? '{{surface}}' : 'transparent', padding: active.captions === 'box' ? 28 : 0, dropFillers: false,
 });
+/** The scene's own caption line, kept small above the spoken-word captions: it follows their alignment. */
+const captionNote = (content: string, frames: number): Layer => active.captions === 'left'
+  ? text('caption-note', content, 60, CAPTIONS_Y - 96, { size: 30, color: '{{muted}}', align: 'left', maxWidth: 900, maxLines: 2, lh: 1.2, anims: [fade(at(frames, 0.3), 14)] })
+  : text('caption-note', content, W / 2, CAPTIONS_Y - 96, { size: 30, color: '{{muted}}', align: 'center', maxWidth: 900, maxLines: 2, lh: 1.2, anims: [fade(at(frames, 0.3), 14)] });
 
 /** Where the viewer is: one segment per scene (past ones filled, the current one filling as it plays) and a "03 / 07" count under the header. */
 const CHAPTER_Y = 1556;
 function chapterBar(i: number, n: number, frames: number): Layer[] {
   const gap = 8, width = Math.max(4, (960 - gap * (n - 1)) / n), x = (k: number) => 60 + k * (width + gap);
+  const count = label('chapter-count', `${String(i + 1).padStart(2, '0')} / ${String(n).padStart(2, '0')}`, W - 120, 218, { size: 24, ls: 4, color: '{{muted}}', align: 'right' });
+  if (active.progress === 'count') return [count];
+  if (active.progress === 'line') {
+    return [rect('chapter-track', 60, CHAPTER_Y + 2, 960, 4, { radius: 2, fill: '{{muted}}', opacity: 0.3 }),
+      rect('chapter-fill', 60, CHAPTER_Y + 2, Math.max(1, 960 * i / n), 4, { radius: 2, fill: GOLD, anims: [anim('width', [0, Math.max(1, 960 * i / n)], [frames, 960 * (i + 1) / n, 'linear'])] }), count];
+  }
+  if (active.progress === 'dots') {
+    const step = n > 1 ? Math.min(56, 960 / (n - 1)) : 0, left = 60 + (960 - step * (n - 1)) / 2;
+    return [...Array.from({ length: n }, (_, k) => circle(`chapter-${k}`, left + k * step, CHAPTER_Y + 4, k === i ? 24 : 14, { fill: k <= i ? GOLD : '{{muted}}', opacity: k <= i ? 1 : 0.35 })), count];
+  }
   return [
     ...Array.from({ length: n }, (_, k) => rect(`chapter-${k}`, x(k), CHAPTER_Y, width, 8, { radius: 4, fill: k < i ? GOLD : '{{muted}}', opacity: k < i ? 0.95 : 0.3 })),
     rect('chapter-fill', x(i), CHAPTER_Y, 1, 8, { radius: 4, fill: GOLD, anims: [anim('width', [0, 1], [frames, width, 'linear'])] }),
-    label('chapter-count', `${String(i + 1).padStart(2, '0')} / ${String(n).padStart(2, '0')}`, W - 120, 218, { size: 24, ls: 4, color: '{{muted}}', align: 'right' }),
+    count,
   ];
 }
 
@@ -639,7 +653,7 @@ function compileWith(spec: Explainer, options: CompileOptions, palette: Record<s
       return { id, name: `${i + 1}. ${scene.kind} (react)`, durationFrames: frames, metadata: { storyboard: sceneBoard(scene, frames) },
         ...(column ? { camera: { x: W / 2, y: H / 2, zoom: fit } } : {}),
         ...(i > 0 ? { transitionIn: { type: '{{transition}}', durationFrames: 14 } } : {}),
-        layers: [...(['fold', 'split', 'route'].includes(scene.kind) ? (kinds[scene.kind] as Kind<any>)(scene, i).layers(frames) : []), ...(cues && sentence ? [text('caption-note', sentence, W / 2, CAPTIONS_Y - 96, { size: 30, color: '{{muted}}', align: 'center', maxWidth: 900, maxLines: 2, lh: 1.2, anims: [fade(at(frames, 0.3), 14)] })] : []),
+        layers: [...(['fold', 'split', 'route'].includes(scene.kind) ? (kinds[scene.kind] as Kind<any>)(scene, i).layers(frames) : []), ...(cues && sentence ? [captionNote(sentence, frames)] : []),
           ...(spec.chapters ? chapterBar(i, spec.scenes.length, frames) : []), ...(cues ? [captionsLayer(cues)] : []),
           ...(spoken ? [{ id: 'voice', type: 'audio', src: spoken.src, startFrame: 8, volume: 1 }] : []), ...reactCues(scene, frames)] };
     }
@@ -656,7 +670,7 @@ function compileWith(spec: Explainer, options: CompileOptions, palette: Record<s
     const cues = spec.captions && spoken?.words?.length ? groupCaptionWords(spoken.words, 6) : undefined;
     const everything = draw.layers(frames), sentence = cues ? everything.find(layer => layer.id === 'caption') : undefined;
     const drawn = cues ? everything.filter(layer => layer.id !== 'caption') : everything;
-    const note = sentence ? [text('caption-note', String(sentence.content), W / 2, CAPTIONS_Y - 96, { size: 30, color: '{{muted}}', align: 'center', maxWidth: 900, maxLines: 2, lh: 1.2, anims: [fade(at(frames, 0.3), 14)] })] : [];
+    const note = sentence ? [captionNote(String(sentence.content), frames)] : [];
     const picture = scene.place === 'top' || scene.kind === 'pile' || scene.kind === 'media' || scene.kind === 'freeform' ? drawn : centred(drawn, cues ? CAPTIONS_Y - (note.length ? 130 : 40) : BAND.bottom);
     return { id: `s${i + 1}-${scene.kind}`, name: `${i + 1}. ${scene.kind}`, durationFrames: frames, metadata: { storyboard: sceneBoard(scene, frames) },
       ...(column ? { camera: { x: W / 2, y: H / 2, zoom: fit } } : {}),
@@ -670,11 +684,17 @@ function compileWith(spec: Explainer, options: CompileOptions, palette: Record<s
   }
   const bed = spec.music !== 'none' && (audio ?? []).some(Boolean)
     ? { audio: `sfx:bed-${spec.music}`, audioVolume: 1, duck: { amount: 0.4, attackFrames: 6, releaseFrames: 18 } } : {};
-  const overlay: Layer[] = [
-    label('header-kind', `${spec.series} ·`, 60, HEADER_Y, { size: 24, ls: 3, color: '{{muted}}' }),
-    label('header-topic', '{{topic}}', 60 + (spec.series.length + 3) * 16.2, HEADER_Y, { size: 24, ls: 3, color: GOLD }),
-    label('header-handle', '{{handle}}', W - 120, HEADER_Y, { size: 24, ls: 3, color: '{{muted}}', align: 'right' }),
-  ];
+  const handle = label('header-handle', '{{handle}}', W - 120, HEADER_Y, { size: 24, ls: 3, color: '{{muted}}', align: 'right' });
+  const overlay: Layer[] = active.header === 'rule' ? [
+    label('header-topic', '{{topic}}', 60, HEADER_Y, { size: 24, ls: 3, color: GOLD }), handle, rect('header-rule', 60, HEADER_Y + 36, 960, 2, { fill: '{{muted}}', opacity: 0.4 })]
+    : active.header === 'stamp' ? [
+      rect('header-tag', 60, HEADER_Y - 12, Math.min(700, spec.topic.length * 18 + 44), 48, { radius: 8, fill: GOLD }),
+      label('header-topic', '{{topic}}', 82, HEADER_Y, { size: 24, ls: 3, color: '{{bg}}' }), handle]
+    : active.header === 'minimal' ? [label('header-topic', '{{topic}}', 60, HEADER_Y, { size: 24, ls: 3, color: GOLD })]
+    : [
+      label('header-kind', `${spec.series} ·`, 60, HEADER_Y, { size: 24, ls: 3, color: '{{muted}}' }),
+      label('header-topic', '{{topic}}', 60 + (spec.series.length + 3) * 16.2, HEADER_Y, { size: 24, ls: 3, color: GOLD }), handle,
+    ];
   // The header and footer are not scene layers, so no scene camera reaches them: scale the column by hand.
   const board = column ? [{ id: 'column', type: 'group', x: (cw - W * fit) / 2, y: (ch - H * fit) / 2, scale: fit, children: overlay }] : overlay;
   const variables = {
