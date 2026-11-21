@@ -13,6 +13,7 @@ Write to these from the first line; the design review and the finished-file chec
 - In a 9:16 video keep text out of the top 8%, the bottom 18% and the right 11%: the platform's buttons cover them.
 - Use the room: a picture that fills under half of the usable height in most frames is noted as empty.
 - Nothing runs off the frame or is clipped by its container.
+- Frame 0 is the thumbnail in many feeds and players: have the hero (title, picture or number) already in view on the first frame, and let the motion start from there. A first frame that is only the background is noted.
 
 **Pictures**
 - A picture or clip must be declared in `config.assets` and used by its id. An undeclared one renders as nothing and is an error (`image-missing`); a declared file that is not in the project fails the build.

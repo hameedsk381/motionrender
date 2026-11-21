@@ -77,3 +77,23 @@ export default function Video() { return <AbsoluteFill style={{ fontFamily: 'Int
     expect(makeReport(result)).not.toMatch(/fills only about/);
   }, 240_000);
 });
+
+// Frame 0 is often the thumbnail: the review says when it is only the background.
+describe('make on a video whose first frame is empty', () => {
+  const film = (body: string) => `import { AbsoluteFill, useCurrentFrame } from 'motionrender/react';
+export const config = { id: 'first', width: 540, height: 960, fps: 30, durationInFrames: 90, background: '#f4efe4', export: { loudness: -16 } };
+export default function Video() { const frame = useCurrentFrame(); return <AbsoluteFill style={{ fontFamily: 'Inter, sans-serif', color: '#1b1b1b' }}>${body}</AbsoluteFill>; }
+`;
+  const project = async (name: string, body: string) => { const root = join(dir, name); await mkdir(root, { recursive: true }); await writeFile(join(root, 'video.tsx'), film(body)); return join(root, 'video.tsx'); };
+  const title = (opacity: string) => `<div style={{ position: 'absolute', left: 40, top: 360, fontSize: 64, fontWeight: 700, lineHeight: 1.2, opacity: ${opacity} }}>The hero is here</div>`;
+
+  it('notes a first frame that is only the background', async () => {
+    const result = await makeVideo({ file: await project('empty-first', title('frame < 12 ? 0 : 1')), every: 15 });
+    expect(makeReport(result)).toMatch(/note .*Frame 0 is only the background/);
+  }, 240_000);
+
+  it('is quiet when the hero is already in view on frame 0', async () => {
+    const result = await makeVideo({ file: await project('full-first', title('1')), every: 15 });
+    expect(makeReport(result)).not.toMatch(/Frame 0 is only the background/);
+  }, 240_000);
+});

@@ -93,7 +93,8 @@ export async function reviewComposition(composition: Composition, options: Revie
   const bands=safeZoneBands(width, height, web ? { top: 0, bottom: 0, left: 0, right: 0, ...options.safeZone } : options.safeZone);
   const safeBands = options.showSafeZones ? bands.map(b => ({ x0: b.x0 / width, y0: b.y0 / height, x1: b.x1 / width, y1: b.y1 / height })) : undefined;
   const renderer=await createRenderer(composition, { baseDir, concurrency: options.concurrency ?? defaultConcurrency(), scale: Math.min(1, 1280/Math.max(width, height)), allowCode: options.allowCode });
-  let reports: FrameReport[]=[], sheet: Buffer; try { let done=0; reports=await Promise.all(frames.map(f => renderer.inspectFrame(f).then(r => { options.onProgress?.(++done, frames.length); return r; })));
+  let reports: FrameReport[]=[], sheet: Buffer, firstFrame: FrameReport | undefined; try { let done=0; reports=await Promise.all(frames.map(f => renderer.inspectFrame(f).then(r => { options.onProgress?.(++done, frames.length); return r; })));
+    firstFrame=await renderer.inspectFrame(0);   // frame 0 is looked at on its own: feeds and players often use it as the thumbnail
     sheet=await renderer.contactSheet(sheetFrames, { columns: options.columns ?? (width >= height ? 4 : 6), safeBands }); } finally { await renderer.close(); }
   const issues: ReviewIssue[]=[], minSide=Math.min(width, height);
   // A picture that did not load renders as nothing and the picture is simply missing from the video: say so, once per picture, then keep these notes out of the text checks.
@@ -153,6 +154,12 @@ export async function reviewComposition(composition: Composition, options: Revie
     covered.sort((a, b) => a - b);
     const median = covered[Math.floor(covered.length / 2)];
     if (covered.length >= 4 && median !== undefined && median < 0.5) issues.push({ severity: 'info', code: 'empty-frame', message: `The picture fills only about ${Math.round(median * 100)}% of the usable height in most frames: scale it up, or give it more to show, so the frame does not look empty` });
+  }
+  // The first frame is often the thumbnail (feeds and players show it before anything plays): if it is only the background, the video is advertised by an empty picture.
+  if (firstFrame) {
+    const { width: w, height: h, pixels } = firstFrame.thumb, corners = [pixels[0]!, pixels[w - 1]!, pixels[(h - 1) * w]!, pixels[h * w - 1]!].sort((a, b) => a - b), ground = (corners[1]! + corners[2]!) / 2;
+    const plain = pixels.filter(v => Math.abs(v - ground) <= 10).length / pixels.length, marked = pixels.filter(v => Math.abs(v - ground) > 14).length / pixels.length;
+    if (plain >= 0.55 && marked < 0.012 && !firstFrame.texts.some(t => t.alpha >= 0.2 && t.words > 0)) issues.push({ severity: 'info', code: 'first-frame-empty', message: 'Frame 0 is only the background: feeds and players often use it as the thumbnail. Have the hero (the title, the picture or the number) already in view on the first frame, and let the motion start from there', frame: 0 });
   }
   // Rhythm and transitions across scenes.
   // The overlay scene (persistent layers) is as long as the video and is no part of its rhythm or its cuts.
