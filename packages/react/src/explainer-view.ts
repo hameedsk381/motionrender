@@ -281,8 +281,8 @@ function stat(ctx: Ctx, s: Record<string, any>, variant: string): ReactElement {
   const note = s.note ? h('div', { key: 'note', style: { ...body(ctx), fontSize: 30, color: col(ctx, 'muted'), textAlign: 'center', ...arrive(ctx, 40) } }, s.note) : null;
   if (pick === 'bleed') {
     return fullStack(ctx, [bleedBlock(ctx, 'band', tone, [
-      h('div', { key: 'v', style: { ...onBand(ctx, fitSize(ctx, value, 340, W - 120), 900), lineHeight: 1, letterSpacing: -4, opacity: clamp(p * 3) } }, shown),
-      h('div', { key: 'l', style: { ...onBand(ctx, 54, 700), lineHeight: 1.2, ...arrive(ctx, 18) } }, String(s.label))], 30, '80px 60px'),
+      h('div', { key: 'v', style: { ...onBand(ctx, fitSize(ctx, value, 340, W - 120), 900), lineHeight: 1.2, letterSpacing: -4, opacity: clamp(p * 3) } }, shown),
+      h('div', { key: 'l', style: { ...onBand(ctx, 54, 700), lineHeight: 1.2, ...arrive(ctx, 18) } }, String(s.label))], 36, '64px 60px'),
       s.note ? inset('note', h('div', { style: { ...body(ctx), fontSize: 30, color: col(ctx, 'muted'), ...arrive(ctx, 40) } }, s.note)) : null], 36);
   }
   if (pick === 'ring') {
