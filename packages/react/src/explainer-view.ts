@@ -63,7 +63,11 @@ function FitBand(props: { band: Band; gap: number; extra: CSSProperties; max?: n
     if (!el || tries.current >= 6) return;
     const natural = el.offsetHeight, shown = natural * scale;
     let next = scale;
-    if (el.scrollWidth > el.clientWidth + 1) next = Math.max(1, scale * (el.clientWidth / el.scrollWidth) * 0.97);   // wider than its column at this scale: step back
+    // Something drawn past the column's right edge at this scale (a long word that cannot wrap): step back until it fits.
+    const box = el.getBoundingClientRect();
+    let right = box.right;
+    el.querySelectorAll('*').forEach(node => { right = Math.max(right, node.getBoundingClientRect().right); });
+    if (right > box.right + 1 && box.width > 0) next = Math.max(1, scale * (box.width / (right - box.left)) * 0.96);
     else if (shown > bandH * FIT_LIMIT) next = Math.max(1, (bandH * FIT_LIMIT) / natural);
     else if (shown < bandH * FIT_TARGET * 0.92 && scale < max) next = Math.min(max, (bandH * FIT_TARGET) / natural);
     if (Math.abs(next - scale) > 0.02) { tries.current += 1; setScale(next); }
@@ -112,7 +116,7 @@ function compare(ctx: Ctx, s: Record<string, any>, variant: string): ReactElemen
       ...side.points.map((p, k) => h('div', { key: k, style: { ...body(ctx, 500), fontSize: 40, lineHeight: 1.25, ...arrive(ctx, 30 + i * 20 + k * 16, 18, 20) } }, p)));
     return fitStack(ctx, [h('div', { key: 'row', style: { display: 'flex', alignItems: 'center', gap: 28 } }, half(sides[0]!, 0),
       h('div', { key: 'vs', style: { ...display(ctx, 900), width: 112, height: 112, flex: 'none', borderRadius: 56, background: col(ctx, 'accent'), color: col(ctx, 'bg'), fontSize: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', transform: `scale(${sp(ctx, 4, 'bouncy')})` } }, 'VS'),
-      half(sides[1]!, 1)), sentence(ctx, s.caption)], 56);
+      half(sides[1]!, 1)), sentence(ctx, s.caption)], 56, {}, 1.25);
   }
   const card = (side: typeof sides[number], i: number) => h(GlassCard, { key: side.key, delay: 6 + i * 16, style: { flex: 1, minWidth: 0, alignSelf: 'stretch', ...solid(ctx), borderTop: `8px solid ${side.tone}`, borderRadius: radius(ctx, 24), padding: '30px 28px', display: 'flex', flexDirection: 'column', gap: 20 } },
     h('div', { style: { ...display(ctx, 800), fontSize: 46, color: side.tone, lineHeight: 1.05 } }, side.title), ...side.points.map((p, k) => point(side, p, k, 6 + i * 16, 34)));
