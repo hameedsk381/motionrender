@@ -38,6 +38,7 @@ export function spring(options: {
 
 export * from './springs';
 export * from './components';
+export * from './illustrations';
 export type VideoConfig = { id?: string; width: number; height: number; fps: number; durationInFrames: number };
 
 // The contexts live on globalThis so the bundle's render function and your components share them whichever copy of this file each imported.

@@ -234,3 +234,12 @@ A video about a topic must not come out as headline, cards and a button. Decide 
 4. **Check it does not look like your last video.** If the page structure repeats, start the layout again before you adjust any colour.
 
 The shape of a chart-as-page, for a falling cost (9:16): a headline of two lines at the top, an `<svg>` the width of the frame whose `path` draws on with `pathLength={1}`, `strokeDasharray={1}` and `strokeDashoffset={1 - draw}` (`draw` from `springValue`), pins that pop in when the line reaches them, then the number counting up with `NumberTicker`. Keep pin labels clear of the line, and keep all text out of the safe-zone bands.
+
+### Pictures for the scenes
+
+A scene about a subject should show the subject. Two sources, neither needs an image model:
+
+- **Illustrations:** `<Illustration name="ballot" color={accent} ink={ink} paper={background} size={230} delay={frame} />` from `motionrender/react` draws itself on (outline first, then colour) in your palette. Names: `server, phone, laptop, person, building, document, bars, globe, ballot, tree, shield, lock, coin, bolt, sun, panel, cloud, heart, bulb, truck`. Pass `paper` the video's background so open shapes read as open. For a subject that is not in the set, draw your own SVG in the same flat style: a 6px ink outline, round caps, one accent fill, and `pathLength={1}` with `strokeDashoffset` driven by `springValue` so it draws on.
+- **Real photos and clips:** `mr stock "solar panels" --kind photo --aspect 9:16` (or `--kind video`) finds one on Pixabay with your own free `PIXABAY_API_KEY`, saves it under `assets/`, lists the credit in `assets/credits.json` and prints the line to paste: `<Img src="assets/pixabay-22.jpg" />` or `<Video src="assets/pixabay-31.mp4" muted />`. Asking again for the same words reuses the file. Show the credit on screen or in the description.
+
+Use a real picture where the subject is a real place or thing (a coastline, a factory, a crowd), an illustration where it is an idea or a process (a vote, a cache, a handshake). Keep pictures out of the top 8% and bottom 18% of a 9:16 frame.

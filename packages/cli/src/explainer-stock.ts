@@ -43,11 +43,38 @@ export type StockStepOptions = {
 };
 
 /** Which library to ask: Pexels when its key is set, else Pixabay; no key at all is an error that says how to get one. */
-function chooseProvider(options: StockStepOptions, scene: number, query: string): { provider: Provider; apiKey: string } {
+function chooseProvider(options: StockStepOptions, scene: number | string, query: string): { provider: Provider; apiKey: string } {
   const pexels = (options.pexelsKey ?? process.env.PEXELS_API_KEY ?? '').trim(), pixabay = (options.pixabayKey ?? process.env.PIXABAY_API_KEY ?? '').trim();
   if (pexels) return { provider: 'pexels', apiKey: pexels };
   if (pixabay) return { provider: 'pixabay', apiKey: pixabay };
-  throw new Error(`Scene ${scene} asks for stock footage ("${query}"), which needs a free key: set PIXABAY_API_KEY (sign up at https://pixabay.com/api/docs/) or PEXELS_API_KEY (Pexels is not giving out new keys at the moment). Or give the scene a file (src).`);
+  throw new Error(`${typeof scene === 'number' ? `Scene ${scene}` : scene} asks for stock footage ("${query}"), which needs a free key: set PIXABAY_API_KEY (sign up at https://pixabay.com/api/docs/) or PEXELS_API_KEY (Pexels is not giving out new keys at the moment). Or give the scene a file (src).`);
+}
+
+/**
+ * One piece of footage for a search: from the choice remembered beside the files when there is one (no request, the same file as last time), else
+ * found on the library, downloaded into assets/ and remembered. The explainer's media scenes and `mr stock` both use it.
+ */
+export async function fetchStockAsset(options: StockStepOptions, request: { query: string; kind: 'photo' | 'video'; orientation: StockOrientation; label: string; scene?: number }): Promise<{ choice: Choice; reused: boolean; limitLeft?: number }> {
+  const use: StockOptions = { ...defaultStockOptions, ...options.stock }, assets = join(options.dir, 'assets'), { query, kind, orientation } = request;
+  await mkdir(assets, { recursive: true });
+  // The choice is remembered per library, so adding a key for another library later does not swap footage that is already chosen.
+  const sidecars = (['pexels', 'pixabay'] as const).map(provider => join(assets, `stock-${createHash('sha1').update(`${provider}|${kind}|${orientation}|${query.toLowerCase()}`).digest('hex').slice(0, 10)}.json`));
+  for (const sidecar of sidecars) {
+    if (!existsSync(sidecar)) continue;
+    try { const saved = JSON.parse(await readFile(sidecar, 'utf8')) as Choice; if (existsSync(join(assets, saved.file))) return { choice: saved, reused: true }; } catch { /* unreadable: look again */ }
+  }
+  const { provider, apiKey } = chooseProvider(options, request.scene ?? 'This search', query);
+  options.onProgress?.(`Looking for ${kind === 'video' ? 'footage' : 'a photo'} of "${query}" on ${STOCK_LABELS[provider]} for ${request.label}…`);
+  // Pixabay's video search has no shape to ask for, so a long page is asked for and the shape is chosen here.
+  const page = await searchStock(provider, apiKey, { q: query, kind, page: 1, perPage: provider === 'pixabay' && kind === 'video' ? 50 : 20, orientation }, use);
+  const best = pick(page.results, kind, orientation);
+  if (!best) throw new Error(`${STOCK_LABELS[provider]} has no ${kind === 'video' ? 'video' : 'photo'} for "${query}" (${request.label}). Try other words, or give it a file (src).`);
+  const bytes = await downloadStock(best.file, use), file = `${provider}-${best.id}${best.ext}`;
+  await writeFile(join(assets, file), bytes);
+  const { file: _link, ...rest } = best;
+  const choice: Choice = { provider, query, kind, orientation, file, result: { ...rest, license: STOCK_LICENSES[provider] } };
+  await writeFile(sidecars[provider === 'pexels' ? 0 : 1]!, JSON.stringify(choice, null, 2) + '\n');
+  return { choice, reused: false, ...(provider === 'pexels' && page.limitLeft !== undefined ? { limitLeft: page.limitLeft } : {}) };
 }
 
 /**
@@ -56,36 +83,16 @@ function chooseProvider(options: StockStepOptions, scene: number, query: string)
  */
 export async function fetchExplainerStock(spec: Explainer, options: StockStepOptions): Promise<{ spec: Explainer; found: number; reused: number; limitLeft?: number }> {
   if (!needsStock(spec)) return { spec, found: 0, reused: 0 };
-  const use: StockOptions = { ...defaultStockOptions, ...options.stock }, orientation = orientationFor(spec.aspect), assets = join(options.dir, 'assets');
+  const orientation = orientationFor(spec.aspect), assets = join(options.dir, 'assets');
   await mkdir(assets, { recursive: true });
   let found = 0, reused = 0, limitLeft: number | undefined;
   const scenes: Explainer['scenes'] = [], credits: { scene: number; credit: string; author: string; authorUrl?: string; pageUrl: string; license: string; file: string }[] = [];
   for (const [i, scene] of spec.scenes.entries()) {
     if (scene.kind !== 'media' || scene.stock === undefined || scene.src !== undefined) { scenes.push(scene); continue; }
     const media: Media = scene, kind = media.stockKind ?? 'photo', query = media.stock!;
-    // The choice is remembered per library, so adding a key for another library later does not swap footage that is already chosen.
-    const sidecars = (['pexels', 'pixabay'] as const).map(provider => join(assets, `stock-${createHash('sha1').update(`${provider}|${kind}|${orientation}|${query.toLowerCase()}`).digest('hex').slice(0, 10)}.json`));
-    let choice: Choice | undefined;
-    for (const sidecar of sidecars) {
-      if (choice || !existsSync(sidecar)) continue;
-      try { const saved = JSON.parse(await readFile(sidecar, 'utf8')) as Choice; if (existsSync(join(assets, saved.file))) choice = saved; } catch { /* unreadable: look again */ }
-    }
-    if (choice) reused++;
-    else {
-      const { provider, apiKey } = chooseProvider(options, i + 1, query);
-      options.onProgress?.(`Looking for ${kind === 'video' ? 'footage' : 'a photo'} of "${query}" on ${STOCK_LABELS[provider]} for scene ${i + 1}…`);
-      // Pixabay's video search has no shape to ask for, so a long page is asked for and the shape is chosen here.
-      const page = await searchStock(provider, apiKey, { q: query, kind, page: 1, perPage: provider === 'pixabay' && kind === 'video' ? 50 : 20, orientation }, use);
-      if (provider === 'pexels' && page.limitLeft !== undefined) limitLeft = page.limitLeft;
-      const best = pick(page.results, kind, orientation);
-      if (!best) throw new Error(`${STOCK_LABELS[provider]} has no ${kind === 'video' ? 'video' : 'photo'} for "${query}" (scene ${i + 1}). Try other words, or give the scene a file (src).`);
-      const bytes = await downloadStock(best.file, use), file = `${provider}-${best.id}${best.ext}`;
-      await writeFile(join(assets, file), bytes);
-      const { file: _link, ...rest } = best;
-      choice = { provider, query, kind, orientation, file, result: { ...rest, license: STOCK_LICENSES[provider] } };
-      await writeFile(sidecars[provider === 'pexels' ? 0 : 1]!, JSON.stringify(choice, null, 2) + '\n');
-      found++;
-    }
+    const { choice, reused: was, limitLeft: left } = await fetchStockAsset(options, { query, kind, orientation, label: `scene ${i + 1}`, scene: i + 1 });
+    if (left !== undefined) limitLeft = left;
+    if (was) reused++; else found++;
     const { stock: _stock, stockKind: _kind, ...rest } = media;
     const credit = media.credit ?? creditLine(kind, choice.result.author, choice.provider);
     scenes.push({ ...rest, src: `assets/${choice.file}`, credit });

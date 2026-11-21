@@ -12,6 +12,7 @@ Usage:
   motionrender <command> [options] (aliases: mr, ove)
 
 Commands:
+  mr stock "<what you want>" [--kind photo|video] [--aspect 9:16] [--dir .]   a real photo or clip saved to assets/ with its credit (needs PIXABAY_API_KEY)
   mr init <dir> [--force] [--no-skill] [--composition]   a code-first video.tsx project (--composition: a composition.json one)
   mr schema [--explainer] [--output composition.schema.json]   the JSON Schema of a composition, or of an explainer script
   mr doctor                      check Node, FFmpeg encoders and the browser
@@ -233,6 +234,7 @@ Press Ctrl+C to stop.`);
   else if (command === 'plan') await (await import('./plan')).runPlan(argv);
   else if (command === 'facts') await (await import('./facts')).runFacts(argv);
   else if (command === 'explainer') await (await import('./explainer')).runExplainer(argv);
+  else if (command === 'stock') await (await import('./stock-command')).runStock(argv);
   else if (command === 'make') await (await import('./make-command')).runMake(argv);
   else { if (!command || !file) throw new Error(usage);
     // A React video source (video.tsx) is built first, into a hidden folder beside it. Running your own source is trusting it, as the build already ran it.
