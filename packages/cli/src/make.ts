@@ -8,6 +8,7 @@ import { explainerSchema, videoPlanSchema, type Explainer } from '@ove/schema';
 import { compileVideoPlan, defaultConcurrency, loadComposition, parseVideoMarkdown, proposePlanRepairs, renderMedia, reviewComposition, reviewRepairTasks, type Composition, type PlanRepairProposal, type ReviewIssue, type ReviewRepairTask } from '@ove/core';
 import { buildExplainer } from './explainer';
 import { buildVideoSource } from './build';
+import { verifyVideo, type VideoCheck } from './verify-video';
 
 export type MakeRender = 'draft' | 'final';
 export type MakeOptions = {
@@ -29,7 +30,7 @@ export type MakeResult = {
   composition?: string;
   summary?: { scenes: number; seconds: number; width: number; height: number; fps: number; spoken?: number };
   review?: { checkpoints?: Awaited<ReturnType<typeof reviewComposition>>["checkpoints"]; sheet: string; sheetFrames: number[]; errors: ReviewIssue[]; warnings: ReviewIssue[]; notes: ReviewIssue[]; repairs: ReviewRepairTask[]; planRepairs?: PlanRepairProposal[]; loudness?: { integrated: number; truePeak: number } };
-  video?: { output: string; draft: boolean; seconds: number; frames: number; renderSeconds: number };
+  video?: { output: string; draft: boolean; seconds: number; frames: number; renderSeconds: number; /** What reading the finished file found: size, length, sound, black and frozen stretches. */ checks: VideoCheck[] };
   notes: string[];
   timings: Record<string, number>;
   next: string[];
@@ -113,7 +114,10 @@ export async function makeVideo(options: MakeOptions): Promise<MakeResult> {
     log(draft ? 'Rendering a quick draft…' : 'Rendering the final video…');
     const rendered = await renderMedia(composition, { baseDir, output, allowCode, concurrency: defaultConcurrency(), ...(draft ? draftSettings : {}) });
     timings.render = seconds(started);
-    video = { output: rendered.output, draft, seconds: rendered.durationSeconds, frames: rendered.frames, renderSeconds: timings.render };
+    // Read the file that was written: the review checks the plan, this checks the result.
+    const exp = composition.export as { loudness?: number; audio?: unknown } | undefined;
+    const checks = await verifyVideo(rendered.output, { width: composition.width, height: composition.height, seconds: composition.durationFrames / composition.fps, audio: JSON.stringify(composition).includes('"type":"audio"') || !!exp?.audio, loudness: typeof exp?.loudness === 'number' ? exp.loudness : undefined, scale: draft ? draftSettings.scale : 1 }).catch((error: Error) => [{ severity: 'warning' as const, code: 'video-unchecked', message: `The finished file could not be checked: ${error.message}` }]);
+    video = { output: rendered.output, draft, seconds: rendered.durationSeconds, frames: rendered.frames, renderSeconds: timings.render, checks };
   } else if (options.render) notes.push('Not rendered: the review found errors. Fix them first.');
 
   const rel = (path: string) => path;
@@ -121,7 +125,7 @@ export async function makeVideo(options: MakeOptions): Promise<MakeResult> {
   if (!clean) next.push('Fix the review errors using the targeted repair tasks, then run make again.');
   else if (!video) next.push(`Look at the contact sheet (${rel(sheet)}) to check the whole video, then run make again with render "draft" to see it move, or "final" for the finished video.`);
   else if (video.draft) next.push('If the draft moves the way you want, run make again with render "final".');
-  return { ok: clean, kind, problems: [], composition: compositionPath, summary, review, video, notes, timings, next };
+  return { ok: clean && !(video?.checks ?? []).some(check => check.severity === 'error'), kind, problems: [], composition: compositionPath, summary, review, video, notes, timings, next };
 }
 
 /** The report as text, short enough to read in one go: what was built, what is wrong, where the files are. */
@@ -151,6 +155,7 @@ export function makeReport(result: MakeResult): string {
     if (proposed.length) lines.push(`Semantic proposals: ${proposed.length}; inspect their edits, then use mr plan edit rather than changing generated layers.`, ...proposed.slice(0, 4).map(repair => `  ${repair.id}${repair.beatId ? ` [beat ${repair.beatId}]` : ''}: ${repair.rationale}`));
   }
   if (result.video) lines.push(`${result.video.draft ? 'Draft video' : 'Video'}: ${result.video.output} (${result.video.seconds.toFixed(1)} s, rendered in ${result.video.renderSeconds} s)`);
+  for (const check of result.video?.checks ?? []) lines.push(`  ${check.severity === 'error' ? 'VIDEO ERROR' : check.severity === 'warning' ? 'video warn' : 'video note'} ${check.message}`);
   lines.push(`Time: ${Object.entries(result.timings).map(([step, took]) => `${step} ${took} s`).join(', ')}`);
   lines.push('', ...result.next);
   return lines.join('\n');

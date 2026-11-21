@@ -35,7 +35,7 @@ MotionRender (\`motionrender\`, short \`mr\`) turns JSON into frame-exact video.
 ## The loop (two calls, not eight)
 1. Write the video (\`video.tsx\`), the script or the composition.
 2. \`mr make video.tsx\` (or \`explainer.json\`, \`composition.json\`; MCP: \`motionrender_make_video\`). One call validates it, builds \`composition.json\`, runs the design review and draws ONE contact sheet of the whole video (\`review.png\`), and lists every problem with where it is. **Open the contact sheet**, fix what it lists, run it again. Add \`--no-voice\` while iterating: it is silent and faster.
-3. When the sheet is right, \`mr make explainer.json --draft\` renders a quick half-size MP4 to check how it moves (about twice as fast as the final), then \`mr make explainer.json --final\` writes \`out.mp4\`. Nothing is rendered over review errors.
+3. When the sheet is right, \`mr make explainer.json --draft\` renders a quick half-size MP4 to check how it moves (about twice as fast as the final), then \`mr make explainer.json --final\` writes \`out.mp4\`. Nothing is rendered over review errors. The finished file is then read back, and anything wrong with it is listed as \`VIDEO ERROR\` or \`video warn\` lines: the wrong size or length, sound that is missing, silent or off its loudness target, a black stretch, a picture that stops changing for most of the video. Fix those and render again; do not hand over a video that lists a \`VIDEO ERROR\`.
 Never say a video is done before you have looked at the contact sheet. The single steps still exist when you want one thing only: \`mr explainer validate\`, \`mr explainer compile\`, \`mr still composition.json --frame 90\`, \`mr review\`, \`mr render\`.
 
 ## Facts, pictures, voices
