@@ -17,6 +17,11 @@ describe('make', () => {
     expect(kindOfFile({ kind: 'video-plan', id: 'launch', beats: [] })).toBe('video-plan');
   });
 
+  it('treats a versioned script with scene kinds but no topic as an explainer, so the error names the missing topic', () => {
+    expect(kindOfFile({ version: '1.0', scenes: [{ kind: 'title' }, { kind: 'closing' }] })).toBe('explainer');
+    expect(kindOfFile({ version: '1.0', scenes: [{ id: 's1', layers: [] }] })).toBe('composition');
+  });
+
   it('lists every problem in a script at once and stops before building or rendering anything', async () => {
     const file = join(dir, 'bad.json');
     await writeFile(file, JSON.stringify({ topic: 'X', scenes: [{ kind: 'hex', columns: 9 }, { kind: 'phone', app: 'A', messages: [] }] }));

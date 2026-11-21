@@ -205,8 +205,10 @@ Use `<Video />` to place video clips under or over your components:
 1. **Always use Flexbox/Grid**: Never calculate absolute pixels like `left: 450px`. Let CSS Flexbox center and space cards cleanly.
 2. **Secondary Motion**: Never let a scene stay 100% still. Combine a fast spring entry (`frame 0-20`) with subtle continuous scale or drift (`interpolate(frame, [0, 90], [1, 1.04])`).
 3. **Typographic Hierarchy**:
-   * Kicker / Badge: 14-16px, uppercase, letterSpacing: `0.05em`.
-   * Headline: 64-96px, fontWeight: `800` or `900`, letterSpacing: `-0.04em`.
-   * Body / Caption: 18-24px, color: `#94a3b8`, lineHeight: `1.6`.
+   * Kicker / Badge: 24px or more (the design review flags labels under 20px), uppercase, letterSpacing: `0.05em`.
+   * Headline: 64-96px at 1080p, up to 144-176px for one big claim; fontWeight: `800` or `900`, letterSpacing: `-0.04em`; **lineHeight at least `1.2`** on large type or the review reports overlaps.
+   * Body / Caption: 26-32px (the review flags body text under 26px), color with 3:1 contrast or better against its background, lineHeight: `1.4`.
+   * Use one scale of 5-8 sizes and reuse it: near-equal sizes (176 and 188) are flagged. Keep to about 40 words on screen and two or three headline-size texts at once.
+   * Set `export: { loudness: -16 }` (-14 for vertical social) in `config`, or the review warns the mix is quiet. Give every `sfx:` `<Sequence>` enough frames to play the sound, and avoid typed or per-letter text effects: they read as flashing text.
 4. **Pure Function Rule**: Every render MUST be a pure deterministic function of `frame`. Do NOT use `useState`, `setTimeout`, or `Math.random()`. Use `random('seed')` from `motionrender/react` for repeatable randomness.
 

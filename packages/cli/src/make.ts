@@ -40,7 +40,9 @@ const readJson = async (file: string) => JSON.parse((await readFile(file, 'utf8'
 const seconds = (since: number) => Math.round((Date.now() - since) / 100) / 10;
 
 /** A video plan declares kind: video-plan; an explainer has topic; a composition has version and no topic. */
-export const kindOfFile = (raw: any): 'explainer' | 'video-plan' | 'composition' => raw?.kind === 'video-plan' ? 'video-plan' : (raw && typeof raw === 'object' && 'version' in raw && !('topic' in raw) ? 'composition' : 'explainer');
+/** An explainer script missing its topic still has scenes with a `kind` and no layers: it is reported as an explainer (so the error names the missing topic), not as a broken composition. */
+const looksLikeExplainerScenes = (raw: any) => Array.isArray(raw?.scenes) && raw.scenes.length > 0 && raw.scenes.every((scene: any) => typeof scene?.kind === 'string' && !('layers' in scene));
+export const kindOfFile = (raw: any): 'explainer' | 'video-plan' | 'composition' => raw?.kind === 'video-plan' ? 'video-plan' : (raw && typeof raw === 'object' && 'version' in raw && !('topic' in raw) && !looksLikeExplainerScenes(raw) ? 'composition' : 'explainer');
 
 /** What the draft render changes: half the size, a fast encode, no motion blur. It is for checking how the video moves, not for sending. */
 export const draftSettings = { scale: 0.5, preset: 'ultrafast' as const, crf: 32, motionBlur: false };
