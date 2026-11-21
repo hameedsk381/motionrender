@@ -1,15 +1,18 @@
 ---
 name: ove
-description: Create and edit videos with MotionRender (mr/ove) by writing a JSON composition, then validating, previewing stills and rendering MP4. Use whenever the user asks to make, change, animate or render a video in a project that has an OVE composition.json.
+description: Create and edit videos with MotionRender (mr/ove) by writing a video.tsx (the default) or a JSON composition, then checking, previewing stills and rendering MP4. Use whenever the user asks to make, change, animate or render a video in a project that has an OVE composition.json.
 ---
 
 # Making videos with MotionRender
 
 This is the entry-point skill for OVE: start here, choose the route below, and load the short task guide that matches the request — `ove-react-video` (high-end React videos with spring physics, glassmorphism and kinetic typography), `ove-code-video` (video written as code, code layers), `ove-make-reel` (social video from blocks), `ove-voiceover-captions`, `ove-batch-videos` and `ove-ai-compose` (AI drafts, refine, history). Come back here for field details.
 
-An OVE video is one JSON file, `composition.json`. You never write rendering code: you edit data, check it, look at frames, and render. `composition.schema.json` next to it is the authoritative JSON Schema; read it when unsure about a field.
+On the JSON route a video is one file, `composition.json`. You never write rendering code: you edit data, check it, look at frames, and render. `composition.schema.json` next to it is the authoritative JSON Schema; read it when unsure about a field.
 
 ## Choose the route first
+
+**Default for a video about a topic: code-first.** Write a `video.tsx` (the `ove-react-video` skill, and `mr guide layout`) so the layout, colours and type are made for this content. The JSON routes below suit ready-made blocks and themes, variables and batch rendering, and quick narrated explainers.
+
 
 Before composing anything, decide *how* this video gets made, in one step: run `ove ai capabilities` (machine-readable with `--json`) and pick the route that fits the brief. A template is used only when its scenes and look already match the video; otherwise write a full composition, or React code when the brief needs motion graphics no layout carries.
 

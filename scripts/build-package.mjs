@@ -53,6 +53,7 @@ await cp(join(root, 'packages/cli/studio'), join(out, 'studio'), { recursive: tr
 const landing = await import(pathToFileURL(join(root, 'site/build.mjs')).href); // the landing page the hosted API serves at / (its Open the app links go to /app/), with its clips and stills
 await mkdir(join(out, 'site'), { recursive: true }); await writeFile(join(out, 'site/index.html'), landing.renderPage(await readFile(join(root, 'site/page.html'), 'utf8'), '/app/')); await cp(join(root, 'site/media'), join(out, 'site/media'), { recursive: true });
 await cp(join(root, 'packages/cli/starter'), join(out, 'starter'), { recursive: true }); await cp(join(root, 'packages/cli/starter-react'), join(out, 'starter-react'), { recursive: true }); await cp(join(root, 'packages/cli/blocks'), join(out, 'blocks'), { recursive: true }); await cp(join(root, 'packages/cli/themes'), join(out, 'themes'), { recursive: true }); await cp(join(root, 'packages/cli/skills'), join(out, 'skills'), { recursive: true }); await cp(join(root, 'packages/cli/guides'), join(out, 'guides'), { recursive: true });
-await cp(join(root, 'docs'), join(out, 'docs'), { recursive: true });
+const internalDocs = ['saas-structure-plan.md', 'video-workflow-benchmark.md', 'design-theme-color-palette-audit.md', 'prompt-motion-ui-guidelines.md'];   // planning notes for the project, not for users of the package
+await cp(join(root, 'docs'), join(out, 'docs'), { recursive: true, filter: source => !internalDocs.some(name => source.endsWith(name)) });
 await cp(join(root, 'LICENSE'), join(out, 'LICENSE')); // packages/ove/README.md is the package's own README, kept in the repository
 console.log(`Built ${relative(root, out)}: dist/index.js, dist/cli.js, dist/player.js, declarations, starter/, skills/`);

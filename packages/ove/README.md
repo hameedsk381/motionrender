@@ -1,21 +1,25 @@
 # motionrender
 
-A JSON-first, frame-deterministic motion graphics video engine. A video is one JSON composition: layers, animation, transitions, video and audio, text, drawing and variables, lists and components. MotionRender renders it in headless Chromium and encodes it with FFmpeg to MP4 (H.264/H.265), WebM (VP9, with transparency), MOV (ProRes), GIF or a folder of PNG frames.
+A frame-deterministic motion graphics video engine. A video is a React component (`video.tsx`), a JSON composition, or a narrated explainer script; MotionRender renders it in headless Chromium and encodes it with FFmpeg to MP4 (H.264/H.265), WebM (VP9, with transparency), MOV (ProRes), GIF or a folder of PNG frames, and checks the design (type sizes, contrast, safe zones, missing pictures, empty frames) and the finished file before you hand it over. It is made to be driven by an AI agent: `mr init` writes the instructions and skills, and there is an MCP server.
 
 ## Requirements
 
 - Node.js 22 or later.
 - FFmpeg with ffprobe, on `PATH` (or set `OVE_FFMPEG_PATH` and `OVE_FFPROBE_PATH`).
+- `esbuild`, `react` and `react-dom` in your project, for videos written as React: `npm install --save-dev esbuild react react-dom`.
 - Chromium for Playwright: `npx playwright install chromium`. On Windows an installed Google Chrome is used if present; `OVE_CHROMIUM_EXECUTABLE` picks a specific browser.
 
 ## Command line
 
 ```sh
 npm install motionrender
-npx motionrender init my-video
-npx motionrender dev my-video/composition.json
-npx motionrender render my-video/composition.json --output out.mp4
+npx motionrender init my-video                      # a code-first project: video.tsx, the agent instructions and skills
+cd my-video && npm install --save-dev esbuild react react-dom && cd ..   # once: the build needs them
+npx motionrender make my-video/video.tsx            # builds it, checks the design, draws one contact sheet (review.png)
+npx motionrender render my-video/video.tsx --output out.mp4
 ```
+
+For a video written as JSON instead, `npx motionrender init my-video --composition` creates a `composition.json`; preview it with `npx motionrender dev my-video/composition.json` and render it with `npx motionrender render my-video/composition.json --output out.mp4`.
 
 You can use `motionrender`, `mr`, or `ove` interchangeably:
 `npx motionrender` lists every command: `init`, `schema`, `doctor`, `browser install`, `dev` (live preview with audio), `render` (formats, codecs, transparency, frame ranges, batch rendering), `ai` and `ai studio` (`motionrender ai studio`).
