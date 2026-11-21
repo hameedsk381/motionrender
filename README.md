@@ -276,17 +276,20 @@ Each folder in [examples/](examples) is a runnable project; render one with `pnp
 
 ## How it compares
 
-From each project's own README, November 2026:
+From each project's own GitHub README and repository page, read on 21 November 2026. "Not stated" means the README does not mention it, which is not the same as the project lacking it.
 
-| | MotionRender | [Remotion](https://github.com/remotion-dev/remotion) | [HyperFrames](https://github.com/heygen-com/hyperframes) |
-|---|---|---|---|
-| You write | JSON, React components or an explainer script | React components | HTML with timing attributes and GSAP timelines |
-| Licence | MIT | A special licence; a company licence is needed in some cases | Apache-2.0 |
-| Ready-made pieces | 63 blocks and 5 themes | Templates, elements, effects, transitions, captions | About 450 blocks |
-| Cloud rendering | A Docker stack with a queue and workers (a shared disk; no serverless option yet) | Lambda and Vercel Sandbox | An AWS Lambda package and hosted sharing |
-| Agents | MCP server, skills, `mr setup` | Agent Skills | A Claude plugin and skills |
+| | MotionRender | [Remotion](https://github.com/remotion-dev/remotion) | [HyperFrames](https://github.com/heygen-com/hyperframes) | [Revideo](https://github.com/redotvideo/revideo) |
+|---|---|---|---|---|
+| GitHub stars | A new project | 74,600 | 87,500 | 4,200 |
+| You write | A React component (`video.tsx`), a script of scenes, a Markdown storyboard or JSON | React components | HTML, CSS, media and seekable animations | TypeScript scenes |
+| Licence | MIT | A special licence; a company licence is needed in some cases | Apache-2.0 | MIT |
+| Agents | MCP server, 17 skills, `mr setup`; works with no AI key | Agent Skills, "make videos agentically" | A Claude Code plugin and 9 skills; a free studio app and a Pro plan that adds HeyGen's models | A scene is plain TypeScript, so an agent can write one |
+| Cloud rendering | A Docker stack with a queue and workers (a shared disk; no serverless option yet; not yet run end to end) | Lambda and client-side rendering | Also the rendering core behind hosted products | A headless render API, parallel workers and a Cloud Run example |
+| Voice and captions | A free Edge voice (needs a connection) and word-timed captions | Captions docs | A captions skill; voice and music models in the Pro plan | Media and audio components |
+| Check before rendering | `mr make`: a design review and a contact sheet, and nothing renders over errors | Not stated | Skills mention lint, preview and render | A React player for preview |
+| Ready-made pieces | 63 blocks and 5 themes | Templates, elements, effects, transitions, captions | A block registry (size not rechecked) | Not stated |
 
-Both are far larger and more established, with tens of thousands of GitHub stars each, and have bigger catalogs and hosted rendering. MotionRender's bet is different: an explainer route that needs no AI key, a design review that stops bad output, and sourced facts, not a bigger catalog.
+The other three are larger and more established: Remotion and HyperFrames have tens of thousands of stars, Revideo thousands, and MotionRender is new. They also have hosted or serverless rendering (Lambda, Cloud Run, a studio app with a Pro plan) that MotionRender does not. MotionRender's bet is different: a route from words to video that needs no AI key, a design review that stops bad output before it renders, and sourced facts, not a bigger catalog or hosting.
 
 ## Commands
 
