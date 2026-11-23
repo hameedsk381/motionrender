@@ -151,7 +151,7 @@ export async function reviewComposition(composition: Composition, options: Revie
   // Composition: the picture should use the room it has. Against a plain ground, find the rows that hold anything and see how much of the usable height
   // (inside the platform bands) they cover; a video that fills a third of it in most frames looks empty however good its parts are.
   {
-    const usable = web ? 1 : 0.82 - 0.08, covered: number[] = [];
+    const usable = web ? 1 : options.safeZonePreset === 'strict' ? 0.5 : 0.82 - 0.08, covered: number[] = [];   // strict leaves y 288 to 1248 of 1920: half the frame
     for (const report of reports) {
       const { width: w, height: h, pixels } = report.thumb, corners = [pixels[0]!, pixels[w - 1]!, pixels[(h - 1) * w]!, pixels[h * w - 1]!].sort((a, b) => a - b), ground = (corners[1]! + corners[2]!) / 2;
       if (pixels.filter(v => Math.abs(v - ground) <= 10).length / pixels.length < 0.55) continue;   // a photo or a busy ground: nothing to measure against

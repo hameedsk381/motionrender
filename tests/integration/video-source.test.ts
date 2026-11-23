@@ -168,3 +168,22 @@ export default function Video() { return <AbsoluteFill style={{ fontFamily: 'Int
     expect(makeReport(await makeVideo({ file, every: 30, safeZone: 'strict' }))).toMatch(/bottom UI band/);
   }, 480_000);
 });
+
+// A text's id follows what it says, not its position among the page's text: lines that come and go above a steady label must not make it look like a new text every time
+// (which gave false "readable for about 1.0 s" warnings on labels that stayed on screen for seconds).
+describe('make: steady labels under changing text', () => {
+  it('does not warn that a label seen for seconds is only readable for one sample', async () => {
+    const root = join(dir, 'steady'); await mkdir(root, { recursive: true });
+    await writeFile(join(root, 'video.tsx'), `import { AbsoluteFill, useCurrentFrame } from 'motionrender/react';
+export const config = { id: 'steady', width: 540, height: 960, fps: 30, durationInFrames: 150, background: '#f4efe4', export: { loudness: -16 } };
+export default function Video() { const f = useCurrentFrame(); const s = { position: 'absolute' as const, left: 40, fontSize: 40, fontWeight: 700, lineHeight: 1.2 };
+  return <AbsoluteFill style={{ fontFamily: 'Inter, sans-serif', color: '#1b1b1b' }}>
+    {f % 30 < 15 ? <div style={{ ...s, top: 120 }}>A caption line</div> : null}
+    {f < 80 ? <div style={{ ...s, top: 400 }}>the label stays seconds</div> : null}
+    <div style={{ ...s, top: 700, left: 40 + f }}>always moving along</div>
+  </AbsoluteFill>; }
+`);
+    const result = await makeVideo({ file: join(root, 'video.tsx'), every: 15 });
+    expect(makeReport(result)).not.toMatch(/"the label stays seconds" is readable for about/);
+  }, 240_000);
+});

@@ -35,8 +35,8 @@ export async function verifyVideo(file: string, expected: VideoExpectation): Pro
   if (Math.abs(length - expected.seconds) > 0.25) checks.push({ severity: 'error', code: 'video-length', message: `The video is ${length.toFixed(2)} s long, not the ${expected.seconds.toFixed(2)} s it was set to` });
   if (expected.audio && !audio) checks.push({ severity: 'error', code: 'video-no-sound', message: 'The video names sound (a voice, music or effects) but the file has no audio stream' });
 
-  // One pass over the file for black stretches, frozen stretches and loudness.
-  const { stderr } = await run(ffmpegPath(), ['-nostats', '-i', file, '-vf', 'blackdetect=d=0.6:pix_th=0.12,freezedetect=n=0.003:d=2.5', ...(audio ? ['-af', 'ebur128'] : ['-an']), '-f', 'null', '-']);
+  // One pass over the file for black stretches, frozen stretches and loudness. A frame counts as black only when 99.8% of it is: a dark design with a little text on it is not a black frame.
+  const { stderr } = await run(ffmpegPath(), ['-nostats', '-i', file, '-vf', 'blackdetect=d=0.6:pix_th=0.12:pic_th=0.998,freezedetect=n=0.003:d=2.5', ...(audio ? ['-af', 'ebur128'] : ['-an']), '-f', 'null', '-']);
   for (const match of stderr.matchAll(/black_start:([\d.]+) black_end:([\d.]+) black_duration:([\d.]+)/g)) {
     const start = Number(match[1]), duration = Number(match[3]);
     if (start < 0.05 && duration < 1.2) continue;   // a fade in from black is a choice

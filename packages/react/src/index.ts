@@ -2,7 +2,7 @@
 // size and length, and what it renders is drawn for that frame. `ove build video.tsx` bundles the component into a `react` layer, which
 // the renderer mounts it live in a page every frame (real effects, canvas and WebGL work) and draws the result as markup, so the output
 // stays frame-exact and goes through the same encoder, audio and review as any other composition. Derive everything from the frame.
-import { Children, createContext, createElement, isValidElement, useContext, useId, type Context, type CSSProperties, type HTMLAttributes, type ImgHTMLAttributes, type ReactElement, type ReactNode } from 'react';
+import { Children, createContext, createElement, isValidElement, useContext, useId, useRef, type Context, type CSSProperties, type HTMLAttributes, type ImgHTMLAttributes, type ReactElement, type ReactNode } from 'react';
 import { interpolate, spring as builderSpring } from '@ove/builder';
 import { sceneOpacity, type SceneFades } from '@ove/animation';
 
@@ -67,6 +67,20 @@ export function delayRender(label?: string): number {
 }
 /** Releases a delayRender handle; the frame is drawn once every handle is released. */
 export function continueRender(handle: number): void { ((globalThis as any).__oveDelays as Map<number, string> | undefined)?.delete(handle); }
+
+/**
+ * A timeline from a library that keeps its own clock (GSAP), sought to the current frame every time the component renders, so it plays by the frame instead of
+ * by the wall clock. Give it the starting values and a function that builds the paused timeline on them; it returns the values as they are at this frame:
+ * `const s = useTimeline({ x: 0, r: 0 }, s => gsap.timeline({ paused: true }).to(s, { x: 900, duration: 2 }).to(s, { r: 360, duration: 2.5 }, 0.2));` then use `s.x`.
+ * The values and the timeline are made once; the timeline's seek(time) takes seconds, as GSAP's does (pass `{ unit: 'ms' }` for one that takes milliseconds).
+ * Checked with GSAP only.
+ */
+export function useTimeline<S extends object>(initial: S, build: (state: S) => { seek(time: number, ...rest: any[]): unknown }, options: { unit?: 'seconds' | 'ms' } = {}): S {
+  const frame = useCurrentFrame(), { fps } = useVideoConfig(), made = useRef<{ state: S; timeline: { seek(time: number, ...rest: any[]): unknown } } | null>(null);
+  if (!made.current) { const state = { ...initial }; made.current = { state, timeline: build(state) }; }
+  made.current.timeline.seek(options.unit === 'ms' ? (frame / fps) * 1000 : frame / fps);
+  return made.current.state;
+}
 
 // Audio and Video are found when you run ove build, which renders the component once per frame and turns each run of frames where one is
 // shown into an audio or video layer (so the mixer and the decoder do their usual frame-exact work). They draw nothing themselves.

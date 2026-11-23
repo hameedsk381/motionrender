@@ -3,9 +3,9 @@ import { readGuides } from '../../packages/cli/src/guide-command';
 
 // `mr guide` prints the craft guides that ship with the package: the floor every video is held to and how to lay one out, picture it, narrate it and move it.
 describe('craft guides', () => {
-  it('ships the five guides, each a titled page', async () => {
+  it('ships the six guides, each a titled page', async () => {
     const guides = await readGuides();
-    expect(guides.map(guide => guide.name)).toEqual(['floor', 'layout', 'motion', 'narration', 'pictures']);
+    expect(guides.map(guide => guide.name)).toEqual(['floor', 'layout', 'libraries', 'motion', 'narration', 'pictures']);
     for (const guide of guides) { expect(guide.title.length, guide.name).toBeGreaterThan(8); expect(guide.text.length, guide.name).toBeGreaterThan(400); expect(guide.text.startsWith(`# ${guide.name}:`), guide.name).toBe(true); }
   });
 

@@ -10,6 +10,7 @@ import { basename, dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { compositionJsonSchema, describeError, loadComposition } from '@ove/core';
 import { resolveBuildable, type Buildable } from '@ove/builder';
+import { selfClockedLibraries } from './own-clock.js';
 
 /** Bundles a React video: the component for the browser (the render function the `react` layer calls) and, separately, its exports for Node. */
 export async function buildReact(source: string, output: string): Promise<void> {
@@ -24,6 +25,11 @@ export async function buildReact(source: string, output: string): Promise<void> 
     ? fileURLToPath(new URL('./world.js', import.meta.url))
     : fileURLToPath(new URL('../../react/src/world.ts', import.meta.url));
 
+  // react-three-fiber, drawn by the frame: its own file too, since it needs the video's own @react-three/fiber and three.
+  const threeEntry = existsSync(fileURLToPath(new URL('./three.js', import.meta.url)))
+    ? fileURLToPath(new URL('./three.js', import.meta.url))
+    : fileURLToPath(new URL('../../react/src/three.tsx', import.meta.url));
+
   // A video written outside any project (a generated one in a scratch folder) has no node_modules of its own: fall back to the react
   // this install resolves, so `import 'react'` works wherever the file lives. A project's own copy still wins, as it is looked up first.
   const nodePaths: string[] = [];
@@ -31,6 +37,9 @@ export async function buildReact(source: string, output: string): Promise<void> 
   for (const name of ['react', 'react-dom']) {
     try { const parent = dirname(dirname(createRequire(import.meta.url).resolve(`${name}/package.json`))); if (!nodePaths.includes(parent)) nodePaths.push(parent); } catch { /* not beside the CLI: the project must provide it */ }
   }
+
+  // The video's own node_modules, from its folder upward: a file that lives in this package (motionrender/three) asks for the video's @react-three/fiber, which is not beside it.
+  for (let dir = dirname(resolve(source)), previous = ''; dir !== previous; previous = dir, dir = dirname(dir)) { const candidate = resolve(dir, 'node_modules'); if (existsSync(candidate) && !nodePaths.includes(candidate)) nodePaths.push(candidate); }
 
   // Fonts, pictures and styles that components import are bundled in (as data), so CSS files and web fonts work like any other library.
   const common = {
@@ -48,6 +57,7 @@ export async function buildReact(source: string, output: string): Promise<void> 
       '@ove/react': reactEntry,
       'motionrender/react': reactEntry,
       'motionrender/world': worldEntry,
+      'motionrender/three': threeEntry,
     },
     loader: { '.woff': 'dataurl', '.woff2': 'dataurl', '.ttf': 'dataurl', '.otf': 'dataurl', '.png': 'dataurl', '.jpg': 'dataurl', '.jpeg': 'dataurl', '.gif': 'dataurl', '.webp': 'dataurl', '.svg': 'dataurl' } as Record<string, 'dataurl'>,
   };
@@ -130,8 +140,9 @@ export const __render = (frame, props, cfg) => { let tree = __ce(__getComp(), pr
       '  flushSync(() => root.render(make(o)));', '  const began = Date.now();', '  while (globalThis.__oveDelays && globalThis.__oveDelays.size > 0) {', "    if (Date.now() - began > 28000) throw new Error('delayRender() was not released within 28 seconds: ' + [...globalThis.__oveDelays.values()].join(', '));", '    await new Promise(r => setTimeout(r, 4));', '  }', '};'])].join('\n');
   let bundle: string;
   try {
-    const built = await esbuild.build({ ...common, stdin: { contents: shim, resolveDir: dirname(source), loader: 'js', sourcefile: 'ove-react-entry.js' }, platform: 'browser', format: 'iife', target: 'es2022', minify: true, outdir: 'out' });
+    const built = await esbuild.build({ ...common, stdin: { contents: shim, resolveDir: dirname(source), loader: 'js', sourcefile: 'ove-react-entry.js' }, platform: 'browser', format: 'iife', target: 'es2022', minify: true, outdir: 'out', metafile: true });
     bundle = built.outputFiles?.find(file => file.path.endsWith('.js'))?.text ?? '';
+    for (const warning of selfClockedLibraries(Object.keys(built.metafile?.inputs ?? {}), await readFile(source, 'utf8').catch(() => ''))) console.warn(warning);
     // CSS the components import becomes a style element, so it reaches the page (and the picture drawn from it) like any stylesheet.
     const css = built.outputFiles?.find(file => file.path.endsWith('.css'))?.text;
     if (css) bundle = `(function(){var s=document.createElement('style');s.textContent=${JSON.stringify(css)};document.head.appendChild(s)})();` + bundle;

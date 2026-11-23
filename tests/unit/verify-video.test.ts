@@ -37,6 +37,13 @@ describe('verifyVideo', () => {
     expect(codes(await verifyVideo(make('nosound', 'testsrc=size=320x240:rate=15', undefined), { ...want, audio: false }))).toEqual([]);
   }, 120_000);
 
+  it('does not call a dark design with a little text on it a black frame', async () => {
+    const file = join(dir, 'dark.mp4');
+    const run = spawnSync(ffmpegPath(), ['-y', '-f', 'lavfi', '-i', 'color=c=0x070a08:size=320x240:rate=15:duration=3,drawbox=x=40:y=40:w=120:h=30:color=0x39ff6a:t=fill,drawbox=x=40:y=120:w=200:h=30:color=0xd9ffe0:t=fill', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=3', '-pix_fmt', 'yuv420p', '-shortest', file], { stdio: 'ignore' });
+    expect(run.status).toBe(0);
+    expect(codes(await verifyVideo(file, want))).not.toContain('video-black');
+  }, 60_000);
+
   it('reports black and frozen stretches', async () => {
     expect(codes(await verifyVideo(make('black', 'color=c=black:size=320x240:rate=15', 'sine=frequency=440'), want))).toContain('video-black');
     expect(codes(await verifyVideo(make('frozen', 'color=c=white:size=320x240:rate=15', 'sine=frequency=440', 4), { ...want, seconds: 4 }))).toContain('video-frozen');
