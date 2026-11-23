@@ -187,3 +187,21 @@ export default function Video() { const f = useCurrentFrame(); const s = { posit
     expect(makeReport(result)).not.toMatch(/"the label stays seconds" is readable for about/);
   }, 240_000);
 });
+
+describe('make: a typeset formula is one text', () => {
+  it('does not count each glyph of a KaTeX formula as a headline-size text', async () => {
+    const root = join(dir, 'formula'); await mkdir(root, { recursive: true });
+    await writeFile(join(root, 'video.tsx'), `import { AbsoluteFill, useCurrentFrame } from 'motionrender/react';
+export const config = { id: 'formula', width: 1280, height: 720, fps: 30, durationInFrames: 90, background: '#0b1428', export: { loudness: -16 } };
+export default function Video() { const f = useCurrentFrame();
+  return <AbsoluteFill style={{ fontFamily: 'Inter, sans-serif', color: '#f1efe8' }}>
+    <div style={{ position: 'absolute', left: 60 + f, top: 60, fontSize: 80, fontWeight: 700, lineHeight: 1.2 }}>Maths</div>
+    <div className="katex-html" style={{ position: 'absolute', left: 60, top: 300, display: 'flex', gap: 24, fontSize: 96, lineHeight: 1.2 }}>
+      {['E', '=', 'm', 'c', '2', '+', 'x'].map((glyph, i) => <span key={i}>{glyph}</span>)}
+    </div>
+  </AbsoluteFill>; }
+`);
+    const result = await makeVideo({ file: join(root, 'video.tsx'), every: 15 });
+    expect(makeReport(result)).not.toMatch(/headline-size texts at once/);
+  }, 240_000);
+});
