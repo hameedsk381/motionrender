@@ -25,7 +25,8 @@ import {
   GlassCard,
   Badge,
   NumberTicker,
-  AmbientGlow,
+  Backdrop,
+  palette,
   Audio
 } from 'motionrender/react';
 
@@ -45,16 +46,12 @@ export const config = {
 export default function Video({ title, stat }: typeof config.props) {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
+  const p = palette('midnight-signal');   // a designed palette: p.bg, p.surface, p.text, p.accent, p.onAccent, p.ramps.brand[500] ... (mr palette lists the presets)
 
   return (
     <AbsoluteFill style={{ color: '#fff', fontFamily: 'Inter, system-ui, sans-serif' }}>
       {/* 1. Atmospheric Ambient Lighting */}
-      <AmbientGlow 
-        orbs={[
-          { x: '25%', y: '20%', size: 700, color: '#6366f1', opacity: 0.28 },
-          { x: '80%', y: '80%', size: 800, color: '#ec4899', opacity: 0.22 },
-        ]} 
-      />
+      <Backdrop palette={p} />
 
       {/* 2. Scene 1: Kinetic Headline (Frames 0 to 90) */}
       <Sequence from={0} durationInFrames={90}>
@@ -118,6 +115,9 @@ export default function Video({ title, stat }: typeof config.props) {
 ## 3. Motion Components Kit Reference
 
 Import directly from `motionrender/react` (or `@ove/react`):
+
+### Colour first
+Read `mr guide design` before choosing colours. `palette('name' | { brand, accent, mode })` gives a tinted ground, surfaces, text, one accent, tonal ramps, `gradient()`, `glow()` and `shadow()`; `<Backdrop palette={p} />` is the ground with depth. Take colours from `p`, never from memory (no default indigo, purple and pink).
 
 ### `<AmbientGlow orbs={[...]} blur={100} />`
 Creates floating, organic gradient light orbs with continuous sine-wave drift in the background.

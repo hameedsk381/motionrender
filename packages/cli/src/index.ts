@@ -13,7 +13,8 @@ Usage:
 
 Commands:
   mr voice "<what is said>" [--voice en-US-AriaNeural] [--rate 0] [--dir .]   a spoken line for a code-first video: audio plus word timings in assets/ (free, needs internet)
-  mr guide [floor|layout|pictures|narration|motion|libraries]   the craft guides: what every video is held to, and how to lay one out, picture it, narrate it, move it, and use npm libraries in it
+  mr palette [name | --brand "#hex" --accent "#hex" --mode dark|light]   designed colour: presets, or a full palette (ground, surfaces, text, accent, ramps) from your colours
+  mr guide [floor|layout|pictures|narration|motion|libraries|design]   the craft guides: what every video is held to, and how to lay one out, picture it, narrate it, move it, and use npm libraries in it
   mr stock "<what you want>" [--kind photo|video] [--aspect 9:16] [--dir .]   a real photo or clip saved to assets/ with its credit (needs PIXABAY_API_KEY)
   mr init <dir> [--force] [--no-skill] [--composition]   a code-first video.tsx project (--composition: a composition.json one)
   mr schema [--explainer] [--output composition.schema.json]   the JSON Schema of a composition, or of an explainer script
@@ -238,6 +239,7 @@ Press Ctrl+C to stop.`);
   else if (command === 'explainer') await (await import('./explainer')).runExplainer(argv);
   else if (command === 'stock') await (await import('./stock-command')).runStock(argv);
   else if (command === 'guide') await (await import('./guide-command')).runGuide(argv);
+  else if (command === 'palette') await (await import('./palette-command')).runPalette(argv);
   else if (command === 'voice') await (await import('./voice-command')).runVoice(argv);
   else if (command === 'make') await (await import('./make-command')).runMake(argv);
   else { if (!command || !file) throw new Error(usage);

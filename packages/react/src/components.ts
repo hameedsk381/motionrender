@@ -1,6 +1,10 @@
 import { createElement, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 import { useCurrentFrame, useVideoConfig } from './index';
 import { springValue, type SpringPreset } from './springs';
+import { palette } from './palette';
+
+// The default glow is two related colours from one designed palette (a blue and its amber signal), not three unrelated hues: pass `orbs` (or use <Backdrop palette>) for the video's own.
+const DEFAULT_GLOW = palette('midnight-signal');
 
 export type AmbientGlowOrb = {
   x: number | string;
@@ -23,9 +27,9 @@ export type AmbientGlowProps = {
  */
 export function AmbientGlow({
   orbs = [
-    { x: '20%', y: '15%', size: 600, color: '#6366f1', opacity: 0.25, speed: 0.03, phase: 0 },
-    { x: '80%', y: '75%', size: 700, color: '#ec4899', opacity: 0.2, speed: 0.025, phase: 2 },
-    { x: '50%', y: '90%', size: 500, color: '#06b6d4', opacity: 0.18, speed: 0.035, phase: 4 },
+    { x: '20%', y: '15%', size: 700, color: DEFAULT_GLOW.ramps.brand[600], opacity: 0.3, speed: 0.03, phase: 0 },
+    { x: '80%', y: '78%', size: 700, color: DEFAULT_GLOW.ramps.accent[500], opacity: 0.14, speed: 0.025, phase: 2 },
+    { x: '50%', y: '95%', size: 560, color: DEFAULT_GLOW.ramps.brand[400], opacity: 0.12, speed: 0.035, phase: 4 },
   ],
   style,
   blur = 100,
@@ -624,8 +628,8 @@ export type WaveformProps = {
 export function Waveform({
   bars = 24,
   height = 50,
-  color = '#6366f1',
-  activeColor = '#ec4899',
+  color = DEFAULT_GLOW.ramps.brand[400],
+  activeColor = DEFAULT_GLOW.accent,
   speed = 0.12,
   delay = 0,
   preset = 'snappy',

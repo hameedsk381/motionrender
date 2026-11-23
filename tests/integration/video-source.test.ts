@@ -205,3 +205,33 @@ export default function Video() { const f = useCurrentFrame();
     expect(makeReport(result)).not.toMatch(/headline-size texts at once/);
   }, 240_000);
 });
+
+describe('make: colour craft', () => {
+  const video = (ground: string, text: string, extra = '') => `import { AbsoluteFill, useCurrentFrame } from 'motionrender/react';
+export const config = { id: 'colour', width: 540, height: 960, fps: 30, durationInFrames: 90, background: '${ground}', export: { loudness: -16 } };
+export default function Video() { const f = useCurrentFrame(); const s = { position: 'absolute' as const, left: 40 + f, fontSize: 48, fontWeight: 700, lineHeight: 1.2 };
+  return <AbsoluteFill style={{ fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ ...s, top: 200, color: '${text}' }}>A clear headline</div>${extra}
+  </AbsoluteFill>; }
+`;
+  it('flags pure white text on a pure black ground', async () => {
+    const root = join(dir, 'pure'); await mkdir(root, { recursive: true });
+    await writeFile(join(root, 'video.tsx'), video('#000000', '#ffffff'));
+    expect(makeReport(await makeVideo({ file: join(root, 'video.tsx'), every: 15 }))).toMatch(/warn .*Pure white text/);
+  }, 240_000);
+  it('flags a pure black ground even when the text is tinted', async () => {
+    const root = join(dir, 'pureground'); await mkdir(root, { recursive: true });
+    await writeFile(join(root, 'video.tsx'), video('#000', '#f1efe8'));
+    expect(makeReport(await makeVideo({ file: join(root, 'video.tsx'), every: 15 }))).toMatch(/warn .*A pure black ground/);
+  }, 240_000);
+  it('flags four unrelated hues in the text, and stays quiet for a tinted ground, off-white text and one accent', async () => {
+    const root = join(dir, 'hues'); await mkdir(root, { recursive: true });
+    const lines = ['#ff3b30', '#34c759', '#0a84ff', '#bf5af2'].map((c, i) => `\n    <div style={{ ...s, top: ${300 + i * 90}, color: '${c}' }}>Line number ${i}</div>`).join('');
+    await writeFile(join(root, 'video.tsx'), video('#0e1626', '#f1efe8', lines));
+    expect(makeReport(await makeVideo({ file: join(root, 'video.tsx'), every: 15 }))).toMatch(/warn .*4 different hues in the text colours/);
+    const calm = join(dir, 'calm'); await mkdir(calm, { recursive: true });
+    await writeFile(join(calm, 'video.tsx'), video('#0e1626', '#f1efe8', `\n    <div style={{ ...s, top: 320, color: '#ffb020' }}>One accent line</div>`));
+    const report = makeReport(await makeVideo({ file: join(calm, 'video.tsx'), every: 15 }));
+    expect(report).not.toMatch(/Pure (white|black)|A pure|different hues/);
+  }, 240_000);
+});

@@ -36,6 +36,7 @@ export const commandSpecs: Record<string, Spec> = {
   make: { values: ['--output', '--sheet', '--voice', '--every', '--safe-zone'], flags: ['--draft', '--final', '--no-voice', '--react', '--no-react', '--allow-code', '--json'], positionals: 1 },
   voice: { values: ['--voice', '--rate', '--output', '--dir', '--fps'], flags: ['--json'], positionals: 1 },
   guide: { values: [], flags: ['--json'], positionals: 1 },
+  palette: { values: ['--brand', '--accent', '--mode', '--harmony'], flags: ['--json'], positionals: 1 },
   stock: { values: ['--kind', '--aspect', '--dir'], flags: ['--json'], positionals: 1 },
   explainer: { values: ['--output', '--voice', '--provider', '--model', '--base-url', '--scenes', '--language', '--media'], flags: ['--no-voice', '--images', '--stock', '--research', '--json'], positionals: 2 },
   still: { values: ['--frame', '--output', '--aspect', ...variables], flags: ['--transparent', '--allow-code'], positionals: 1 },
