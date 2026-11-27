@@ -17,6 +17,13 @@ description: Applies motion design principles to create emotionally-driven, tech
 - **Video is seen once, in sequence.** "Fine on the 100th viewing" matters less than the narrative: setup, action, resolution (`director/narrative-structure.md`), one hero motion per beat, and a short pause before the next beat.
 - Check the result the usual way: `mr make` (the contact sheet shows the layers and hierarchy), then `--draft` for the motion.
 
+### Review morphs and loops in motion
+
+- **Sample the handoff.** Use beat stills to judge the poses, then watch the draft at normal speed and step through the frames before, during, and after each morph. Check that the same control can be followed through changes in position, size, and radius. Review label exit and entry separately so the labels stay legible.
+- **Follow the pointer tip.** Check that it lands inside the intended hit area when the click cue fires. For a drag, inspect the grab, held movement, release, and settle. The value should track the pointer while held. At release, capture the value from the release position, then hold it or spring from it according to the control's behavior. Move the pointer away during review and verify that the released value ignores that movement.
+- **Watch the loop across the seam.** Play at least two repeats. Compare the opening and closing pose, camera, and pointer position. Step through the frames on both sides to check direction and speed, and listen for an audio click or a missed beat. If the brief calls for identical first and last frames, compare the actual rendered endpoint frames as well. Check that any settling time feels intentional.
+- **Record and recheck.** Note the timecode, expected behavior, and observed behavior for each issue. Re-render the affected range after fixing it, then review the complete draft before export.
+
 # Motion Design Skill
 
 ## When to Apply

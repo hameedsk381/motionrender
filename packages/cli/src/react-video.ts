@@ -10,26 +10,44 @@ import { critiqueFrameNumbers, drawableBrand, runVideoAgent, type AiProvider, ty
 import { buildReact } from './build';
 
 type VisualCheck = (videoPath: string, compositionPath: string) => Promise<{ passed: boolean; report: string; sheet?: Buffer }>;
+type BriefChecks = { seconds: number; copy: readonly string[] };
+const normalizeCopy = (text: string) => text.replace(/\s+/g, ' ').trim();
 
 /**
  * Renders a few frames and runs the renderer's design review over a built React video, so the agent can repair one that
  * compiles but does not look right. `onReview` receives what the last check found.
  */
-export function reactVisualCheck(baseDir: string, onReview?: (issues: ReviewIssue[]) => void): VisualCheck {
+export function reactVisualCheck(baseDir: string, onReview?: (issues: ReviewIssue[]) => void, brief?: BriefChecks): VisualCheck {
   return async (_videoPath, compositionPath) => {
     let raw: string;
-    try { raw = await readFile(compositionPath, 'utf8'); } catch { return { passed: true, report: '' }; }
+    try { raw = await readFile(compositionPath, 'utf8'); } catch { return { passed: false, report: 'Missing built composition.' }; }
     const composition = loadComposition(JSON.parse(raw));
     const totalFrames = composition.durationFrames;
+    if (brief && totalFrames !== Math.max(30, Math.round(brief.seconds * composition.fps))) {
+      return { passed: false, report: `Duration is ${totalFrames / composition.fps}s. Required ${brief.seconds}s. Set config.durationInFrames to ${Math.max(30, Math.round(brief.seconds * composition.fps))} at ${composition.fps} fps and retime the choreography.` };
+    }
     // Four frames spread over the video, read as thumbnails because the renderer's text report cannot see text drawn by a
     // React component. A video whose beats all draw something changes between them; three samples that are the same
     // picture mean most of the video shows nothing new, which the layout review cannot see because it measures elements.
     const samples: { frame: number; pixels: number[] }[] = [];
+    const requiredCopy = brief?.copy ?? [];
+    const missingCopy = new Set(requiredCopy.map(normalizeCopy));
+    const sampleFrames = [0.15, 0.4, 0.65, 0.9].map(fraction => Math.min(totalFrames - 1, Math.round(fraction * totalFrames)));
+    const copyFrames = requiredCopy.length ? Array.from({ length: 25 }, (_, index) => Math.round((totalFrames - 1) * index / 24)) : [];
     const renderer = await createRenderer(composition, { baseDir, allowCode: true, scale: Math.min(1, 1280 / Math.max(composition.width, composition.height)) });
     try {
-      for (const fraction of [0.15, 0.4, 0.65, 0.9]) {
-        const frame = Math.min(totalFrames - 1, Math.round(fraction * totalFrames));
-        try { samples.push({ frame, pixels: (await renderer.inspectFrame(frame)).thumb.pixels }); }
+      for (const frame of new Set([...sampleFrames, ...copyFrames])) {
+        try {
+          const inspected = await renderer.inspectFrame(frame);
+          if (sampleFrames.includes(frame)) samples.push({ frame, pixels: inspected.thumb.pixels });
+          const visible = inspected.texts.filter(note => note.kind === 'text' && note.alpha >= .5 && !note.truncated && !note.clipped && !note.occluded &&
+            note.x0 >= 0 && note.y0 >= 0 && note.x1 <= composition.width && note.y1 <= composition.height)
+            .map(note => note.text);
+          const joined = normalizeCopy(visible.join(' '));
+          for (const phrase of missingCopy) {
+            if (visible.some(text => normalizeCopy(text) === phrase) || ` ${joined} `.includes(` ${phrase} `)) missingCopy.delete(phrase);
+          }
+        }
         catch { /* the review below reports why */ }
       }
     } finally { await renderer.close(); }
@@ -44,6 +62,7 @@ export function reactVisualCheck(baseDir: string, onReview?: (issues: ReviewIssu
         ? { ...issue, severity: 'error' as const, code: 'frames-still', message: `${issue.message} — ${(stillFor / composition.fps).toFixed(1)} s of a ${(totalFrames / composition.fps).toFixed(1)} s video. ${sequenceHint}` }
         : issue;
     });
+    for (const phrase of missingCopy) found.push({ severity: 'error', code: 'required-copy', message: `No sampled frame showed the exact visible phrase ${JSON.stringify(phrase)}. Keep it fully on-canvas and readable as DOM or SVG text.` });
     // Thumbnails of the same picture: a group of three or more among the four samples covers most of the video. A clip
     // of a few seconds may legitimately hold one card still, so this only applies once the video is long enough for a hold
     // to swallow it.
@@ -90,7 +109,7 @@ export async function reactFromPlan(provider: AiProvider, plan: BuildPlan, optio
   const tidy = async () => { for (const name of await readdir(baseDir).catch(() => [] as string[])) if (!before.has(name)) await rm(join(baseDir, name), { recursive: true, force: true }); };
   let result: Awaited<ReturnType<typeof runVideoAgent>>;
   try { result = await runVideoAgent(provider, {
-    brief: options.brief,
+    brief: options.requiredCopy?.length ? `${options.brief}\nRequired visible copy, verbatim: ${JSON.stringify(options.requiredCopy)}` : options.brief,
     dir: options.baseDir,
     // Resolve the format from the canvas actually planned: a 9:16 project is a reel even when the brief never says so.
     format: options.height >= options.width ? 'reel' : 'landscape',
@@ -101,7 +120,7 @@ export async function reactFromPlan(provider: AiProvider, plan: BuildPlan, optio
     plan: { idea: plan.idea, look: plan.look, beats: plan.beats },
     onProgress: options.onProgress,
     signal: options.signal,
-    visualCheck: reactVisualCheck(options.baseDir, issues => { checked = issues; }),
+    visualCheck: reactVisualCheck(options.baseDir, issues => { checked = issues; }, { seconds: options.durationSeconds, copy: options.requiredCopy ?? [] }),
     critiqueFrames: reactCritiqueFrames(options.baseDir),
   }, buildReact); } catch (error) { await tidy(); throw error; }
   if (!result.composition) { await tidy(); throw new Error('The React video was written but produced no composition'); }

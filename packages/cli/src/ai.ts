@@ -78,14 +78,16 @@ const kinds: Record<string, { aspect: string; duration: number; label: string }>
 };
 const aspects: Record<string, [number, number]> = { '9:16': [1080, 1920], '1:1': [1080, 1080], '16:9': [1920, 1080], '4:5': [1080, 1350], '3:4': [1080, 1440] };
 
-function canvas(argv: string[]) {
+function canvas(argv: string[], brief = '') {
   const kindName = option(argv, '--kind') ?? 'promo';
   const preset = kinds[kindName];
   if (!preset) throw new Error(`--kind must be one of: ${Object.keys(kinds).join(', ')}`);
   const aspect = option(argv, '--aspect') ?? preset.aspect;
   const custom = /^(\d+)x(\d+)$/.exec(aspect);
   const [width, height] = custom ? [Number(custom[1]), Number(custom[2])] : aspects[aspect] ?? (() => { throw new Error(`--aspect must be one of ${Object.keys(aspects).join(', ')}, or WIDTHxHEIGHT`); })();
-  return { width, height, kind: preset.label, durationSeconds: numberOption(argv, '--duration', preset.duration), fps: numberOption(argv, '--fps', 30) };
+  const durations = [...brief.matchAll(/\b(\d+(?:\.\d+)?)\s*-\s*second\s+(?:(?:[\w-]+)\s+){0,4}(?:video|film|reel|clip|animation)\b/gi)];
+  const requested = durations.length === 1 ? Number(durations[0]![1]) : 0;
+  return { width, height, kind: preset.label, durationSeconds: numberOption(argv, '--duration', requested > 0 ? requested : preset.duration), fps: numberOption(argv, '--fps', 30) };
 }
 
 function fieldsOption(argv: string[]) {
@@ -169,7 +171,13 @@ async function composeCommand(argv: string[]): Promise<number> {
     if (entries.some(name => name !== 'assets')) throw new Error(`${dir} is not empty; pass --force to write into it anyway`);
   }
   const provider = providerFrom(argv);
-  const canvasOptions = canvas(argv);
+  const canvasOptions = canvas(argv, brief);
+  const requiredCopy = argv.flatMap((arg, i) => {
+    if (arg !== '--require-copy') return [];
+    const phrase = argv[i + 1]?.trim();
+    if (!phrase || phrase.startsWith('--')) throw new Error('--require-copy needs a phrase');
+    return [phrase];
+  });
   const narration = flag(argv, '--narration');
   const full = flag(argv, '--full');
 
@@ -202,7 +210,7 @@ async function composeCommand(argv: string[]): Promise<number> {
 
   const options: ComposeOptions = { ...canvasOptions, brief: effectiveBrief, maxAttempts: numberOption(argv, '--max-attempts', 3),
     review: flag(argv, '--review'), strict: flag(argv, '--strict'), plan: full, baseDir: dir, narration, fields: fieldsOption(argv), assets: assetOptions(argv, dir),
-    content, sources: sources.length ? sources : undefined, research: flag(argv, '--no-research') ? false : undefined,
+    content, requiredCopy, sources: sources.length ? sources : undefined, research: flag(argv, '--no-research') ? false : undefined,
     language: option(argv, '--language') ?? option(argv, '--lang'),
     includeSchema: flag(argv, '--schema'), signal: undefined, onProgress: message => console.log(message) };
   let result;
@@ -212,6 +220,7 @@ async function composeCommand(argv: string[]): Promise<number> {
     throw new Error(`Composition generation failed.\n${describeError(error)}`);
   }
   let composition = result.composition;
+  if (requiredCopy.length && result.route !== 'react') throw new Error('--require-copy requires the local React composition route');
   const narrationFiles: string[] = [];
   if (narration) {
     const voice = option(argv, '--voice');

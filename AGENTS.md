@@ -102,7 +102,7 @@ Add to `.cursor/mcp.json`:
 
 ## 3. Claude Skills (`.claude/skills`)
 
-For Claude Code or Anthropic agent environments, MotionRender includes 17 skills (`motionrender` and `ove` are the same entry point under two names). One project agent also lives in `.claude/agents/`: `solution-architect`, which maps the monorepo and writes architecture notes.
+For Claude Code or Anthropic agent environments, MotionRender includes 25 skills (`motionrender` and `ove` are the same entry point under two names). One project agent also lives in `.claude/agents/`: `solution-architect`, which maps the monorepo and writes architecture notes.
 - `motionrender` / `ove`: Main entry point and composition grammar.
 - `ove-explainer`: Vertical explainer videos from scenes and spoken lines (how-it-works, system design, money basics): the fastest route to a finished video, no AI key needed.
 - `ove-agent`: Autonomous video director: brief to a finished React or JSON video, with a visual self-check loop.
@@ -119,6 +119,14 @@ For Claude Code or Anthropic agent environments, MotionRender includes 17 skills
 - `ove-paper-collage`: Editorial halftone paper-collage B-roll and stop-motion cutouts.
 - `ove-papercut`: Layered papercraft explainers and paper-diorama videos.
 - `ove-remotion`: Run and adapt Remotion compositions with MotionRender.
+- `ove-reference-video-analysis`: Turn a permitted reference video into a reusable direction brief without copying its media or identity.
+- `ove-product-demo`: Create a verified product-demo or launch reel from a website, screenshot, or feature brief.
+- `ove-data-visualization`: Turn cited CSV, JSON, and facts into accurate animated data stories.
+- `ove-talking-head-editor`: Produce editable captioned shorts from user-provided recordings.
+- `ove-sound-design`: Plan and verify narration, music, effects, and loudness.
+- `ove-webgl-shaders`: Create deterministic 3D and shader scenes with a fallback plan.
+- `ove-kinetic-type`: Choreograph readable frame-accurate motion typography and captions.
+- `ove-motion-recipes`: Find upstream motion techniques and map them to MotionRender workflows.
 
 ---
 

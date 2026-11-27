@@ -15,6 +15,8 @@ import { copyProblems, repairCopy } from './copy';
 
 export type ComposeOptions = PromptOptions & {
   brief: string;
+  /** Exact phrases that the React route must show in visible text. */
+  requiredCopy?: readonly string[];
   maxAttempts?: number;
   /** Run `ove review`-style checks between attempts and feed design errors back. Slow; off by default. */
   review?: boolean;

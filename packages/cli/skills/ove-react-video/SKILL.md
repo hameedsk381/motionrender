@@ -49,11 +49,11 @@ export default function Video({ title, stat }: typeof config.props) {
   return (
     <AbsoluteFill style={{ color: '#fff', fontFamily: 'Inter, system-ui, sans-serif' }}>
       {/* 1. Atmospheric Ambient Lighting */}
-      <AmbientGlow 
+      <AmbientGlow
         orbs={[
           { x: '25%', y: '20%', size: 700, color: '#6366f1', opacity: 0.28 },
           { x: '80%', y: '80%', size: 800, color: '#ec4899', opacity: 0.22 },
-        ]} 
+        ]}
       />
 
       {/* 2. Scene 1: Kinetic Headline (Frames 0 to 90) */}

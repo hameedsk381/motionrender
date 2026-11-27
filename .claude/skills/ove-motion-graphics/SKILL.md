@@ -11,8 +11,8 @@ MotionRender provides a motion design toolkit matching top-tier Claude-style mot
 
 ## 1. Design Aesthetics & Visual Foundations
 
-- **Colour comes from a palette, not from memory.** Run `mr palette` (presets) or `mr guide design`, then `const p = palette('obsidian-ember')` (or `palette({ brand: '#...', accent: '#...' })`) from `motionrender/react` and use only `p.*` tokens. Do not reach for indigo, purple and pink by default: that is the generic look.
-- **Ground**: `<Backdrop palette={p} />` first in the video: a tinted ground (never pure black or white), two soft glows, a vignette and fine grain.
+- **Canvas Background**: Deep dark tones (`#07080d`, `#0a0b12`, `#090d16`).
+- **Glow & Atmosphere**: Use `<AmbientGlow>` with 2-3 colorful radial orbs (`#6366f1` Indigo, `#a855f7` Purple, `#ec4899` Pink, `#06b6d4` Cyan) with 100px+ blur.
 - **Surface Elevation**: Frosted glassmorphism with `rgba(255, 255, 255, 0.05)`, `backdropFilter: blur(24px)`, and fine 1px border highlight `rgba(255, 255, 255, 0.12)`.
 - **Spring Physics over Linear Easing**: Always animate entrances using `springValue` presets:
   - `'snappy'`: UI cards, bento containers, buttons (stiffness 180, damping 18)
@@ -75,7 +75,7 @@ import { Typewriter } from '@ove/react';
 ```tsx
 import { Waveform } from '@ove/react';
 
-<Waveform bars={32} height={60} color={p.ramps.brand[400]} activeColor={p.accent} speed={0.15} />
+<Waveform bars={32} height={60} color="#6366f1" activeColor="#ec4899" speed={0.15} />
 ```
 
 ### Code Editor Window

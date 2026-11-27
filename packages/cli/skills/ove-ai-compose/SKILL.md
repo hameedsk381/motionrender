@@ -14,6 +14,7 @@ AI runs before rendering; the video is still deterministic. Check the provider w
 - A planner decides first: a JSON composition built from blocks, effects and moves, or (on your own machine) React code. `--no-plan` skips it. The model writes a whole composition when you pass `--full`, `--fields` or footage and sound assets.
 - `--asset` pictures and clips are offered to the model; it may use only ids you supply.
 - `--review` adds the renderer's design checks as feedback; use it for finished work, not drafts.
+- Use `--duration 12` to set an explicit 12-second target. For local React composition, repeat `--require-copy "Exact phrase"` for each required phrase. The composer checks visible text in sampled frames and sends missing phrases back for repair.
 
 ## Refine
 

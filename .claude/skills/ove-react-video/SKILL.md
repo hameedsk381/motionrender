@@ -25,8 +25,7 @@ import {
   GlassCard,
   Badge,
   NumberTicker,
-  Backdrop,
-  palette,
+  AmbientGlow,
   Audio
 } from 'motionrender/react';
 
@@ -46,12 +45,16 @@ export const config = {
 export default function Video({ title, stat }: typeof config.props) {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
-  const p = palette('midnight-signal');   // a designed palette: p.bg, p.surface, p.text, p.accent, p.onAccent, p.ramps.brand[500] ... (mr palette lists the presets)
 
   return (
     <AbsoluteFill style={{ color: '#fff', fontFamily: 'Inter, system-ui, sans-serif' }}>
       {/* 1. Atmospheric Ambient Lighting */}
-      <Backdrop palette={p} />
+      <AmbientGlow
+        orbs={[
+          { x: '25%', y: '20%', size: 700, color: '#6366f1', opacity: 0.28 },
+          { x: '80%', y: '80%', size: 800, color: '#ec4899', opacity: 0.22 },
+        ]}
+      />
 
       {/* 2. Scene 1: Kinetic Headline (Frames 0 to 90) */}
       <Sequence from={0} durationInFrames={90}>
@@ -89,35 +92,31 @@ export default function Video({ title, stat }: typeof config.props) {
 ## 2. Core Build Loop
 
 1. **Write or edit** `video.tsx`.
-2. **Build the bundle & composition**:
+2. **Check it in one call** (the video is the `.tsx`; there is no composition.json to build or keep):
    ```bash
-   ove build video.tsx
+   mr make video.tsx
    ```
-   * Compiles your React JSX with `esbuild`.
-   * Emits `video.bundle.js` and `composition.json`.
-3. **Inspect Still Frames**:
+   * Compiles your React with `esbuild` into a hidden `.motionrender/` folder beside the file, runs the design review and draws one contact sheet of the whole video (`review.png`). Fix what it lists and run it again.
+3. **Inspect Still Frames** (every command takes `video.tsx` itself):
    ```bash
-   ove still composition.json --frame 45 --output still-45.png
-   ove still composition.json --frame 135 --output still-135.png
+   mr still video.tsx --frame 45 --output still-45.png
+   mr still video.tsx --frame 135 --output still-135.png
    ```
-4. **Visual Review Sheet** (samples frames across the whole video):
+4. **A quick draft to see it move**:
    ```bash
-   ove review composition.json --output review.png
+   mr make video.tsx --draft
    ```
 5. **Render High-Quality MP4**:
    ```bash
-   ove render composition.json --allow-code --output out.mp4
+   mr render video.tsx --output out.mp4
    ```
-   *(Note: React videos execute component code during headless rendering, so `--allow-code` is required).*
+   *(Running your own source counts as trusting it, so `--allow-code` is not needed for a `.tsx`. A new project starts with `mr init my-video --react`.)*
 
 ---
 
 ## 3. Motion Components Kit Reference
 
 Import directly from `motionrender/react` (or `@ove/react`):
-
-### Colour first
-Read `mr guide design` before choosing colours. `palette('name' | { brand, accent, mode })` gives a tinted ground, surfaces, text, one accent, tonal ramps, `gradient()`, `glow()` and `shadow()`; `<Backdrop palette={p} />` is the ground with depth. Take colours from `p`, never from memory (no default indigo, purple and pink).
 
 ### `<AmbientGlow orbs={[...]} blur={100} />`
 Creates floating, organic gradient light orbs with continuous sine-wave drift in the background.

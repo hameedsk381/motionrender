@@ -284,7 +284,7 @@ From each project's own GitHub README and repository page, read on 21 November 2
 | GitHub stars | A new project | 74,600 | 87,500 | 4,200 |
 | You write | A React component (`video.tsx`), a script of scenes, a Markdown storyboard or JSON | React components | HTML, CSS, media and seekable animations | TypeScript scenes |
 | Licence | MIT | A special licence; a company licence is needed in some cases | Apache-2.0 | MIT |
-| Agents | MCP server, 17 skills, `mr setup`; works with no AI key | Agent Skills, "make videos agentically" | A Claude Code plugin and 9 skills; a free studio app and a Pro plan that adds HeyGen's models | A scene is plain TypeScript, so an agent can write one |
+| Agents | MCP server, 25 skills, `mr setup`; works with no AI key | Agent Skills, "make videos agentically" | A Claude Code plugin and 9 skills; a free studio app and a Pro plan that adds HeyGen's models | A scene is plain TypeScript, so an agent can write one |
 | Cloud rendering | A Docker stack with a queue and workers (a shared disk; no serverless option yet; not yet run end to end) | Lambda and client-side rendering | Also the rendering core behind hosted products | A headless render API, parallel workers and a Cloud Run example |
 | Voice and captions | A free Edge voice (needs a connection) and word-timed captions | Captions docs | A captions skill; voice and music models in the Pro plan | Media and audio components |
 | Check before rendering | `mr make`: a design review and a contact sheet, and nothing renders over errors | Not stated | Skills mention lint, preview and render | A React player for preview |

@@ -51,7 +51,7 @@ export default function Promo({ title }) {
 }
 ```
 
-- `ove build promo.tsx` (needs `react`, `react-dom`, `esbuild` installed) writes `composition.json` and `promo.bundle.js`; render with `--allow-code`. Rebuild after every edit.
+- A React video is its `.tsx`: `mr make promo.tsx`, `mr render promo.tsx --output out.mp4`, `mr still` and `mr review` take it directly (needs `react`, `react-dom`, `esbuild` installed). The build keeps its work in a hidden `.motionrender/` folder, so there is no composition.json to edit or rebuild. (`ove build promo.tsx` still writes one next to the file.)
 - Audio and video: `<Audio src="sfx:whoosh" />` and `<Video src="..." />` are automatically scanned and promoted to native audio/video layers.
 - For complete guide, component library, and spring presets, read the **`ove-react-video`** skill.
 
@@ -70,6 +70,25 @@ code(function draw(ctx, { frame, t, fps, width, height, props, api }) {
 - The function is copied into the composition as text: it must use nothing from the surrounding file (pass data in `props`). A `src` file path works too: a `.js` file defining `function draw(ctx, args)`.
 - It executes JavaScript while rendering, so `ove still|review|render|dev|thumbnail` refuse it unless you pass `--allow-code`. Pass that flag only for files you wrote or have read. The AI commands and the Studio never accept code layers; do not paste code layers from other people.
 - Check with `ove still <file> --frame <n> --allow-code`, and look at frames at the start, middle and end.
+
+## Hand-drawn, physics and p5.js
+
+Three libraries are built in; each is drawn the same on every render and in the Player.
+
+- **Hand-drawn (rough.js).** Any rectangle or circle takes `sketch: {}` (or `{ roughness, bowing, fillStyle, hachureGap, fillWeight, boil, seed }`): loose double-stroke outlines, and a solid fill with hand-cut edges or hatching (`hachure`, `cross-hatch`, `zigzag`, `dots`, `dashed`). A top-level `sketch` on the composition reaches every rectangle, circle and physics layer; a layer opts out with `sketch: false`. `boil: 6` redraws the lines every 6 frames like a hand-redrawn cartoon. No `--allow-code` needed.
+- **Physics (matter.js).** `physics(...)` (or `{ type: 'physics' }`) is a world of bodies that fall, bounce and pile up: `bodies` (set circles and rectangles, `static` ones to land on, `at` to appear later) and `emit` (many bodies: `count`, `every` frames, `spread`, `widthJitter`, `fill` as one colour or a list). `gravity`, `walls` (`box`, `floor`, `none`) and `seed` shape it. It is simulated from the layer's first frame with fixed steps, so any frame can be drawn alone and every render agrees. No `--allow-code` needed.
+- **p5.js.** `p5((p, args) => { ... }, { width, height })` runs a p5 sketch's drawing once per frame: `p` is the p5 instance, `args` is `{ frame, t, fps, width, height, props, api }`. Before each frame the random and noise seeds are set and the canvas is cleared, so `p.random()` and `p.noise()` repeat and a frame depends only on its number. Do not build a picture up from frame to frame, and use `args.t`, not `millis()` tricks, for time. Like `code`, it runs JavaScript while rendering, so it needs `--allow-code`, and the AI commands never write it. p5.js is large and is loaded only for videos that have a p5 layer.
+
+## 3D models
+
+A `model` layer draws a 3D model (a `.glb` file, or a `.gltf` with its pictures and data embedded) with three.js: `{ "type": "model", "src": "assets/robot.glb", "x": 140, "y": 400, "width": 800, "height": 800, "spin": 30 }` (or `model(src, { width, height, ... })` in the builder).
+
+- The model is centred and fitted to the box, so it never clips whatever its angle. `zoom` sizes it in the box and `fov` flattens or exaggerates the perspective; the background is transparent, so it sits over whatever is behind it.
+- Turn it with `yaw`, `pitch` and `roll` (degrees), or `spin` (degrees per second added to yaw). To animate them, animate the variables `--yaw`, `--pitch`, `--roll` and `--zoom` on the layer, like shader variables: `{ "property": "--yaw", "keyframes": [{ "frame": 0, "value": 0 }, { "frame": 90, "value": 180, "easing": "land" }] }`.
+- `animation` plays one of the model's own animations by name or number, at the time the frame gives (`animationSpeed` scales it). A wrong name lists the ones the file has.
+- A frame depends only on its number, so renders repeat exactly. A model file is data, so `--allow-code` is not needed. three.js is loaded only for videos that have a model layer.
+- Limits: no model compression plugins (Draco, meshopt, KTX2 textures) and no `.gltf` that points at separate files. Export the model as a plain `.glb`.
+- In the studio, upload a `.glb` in the Media tab and add it to a scene.
 
 ## Choosing
 

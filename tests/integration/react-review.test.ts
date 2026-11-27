@@ -3,7 +3,29 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
 import { buildReact } from '../../packages/cli/src/build';
+import { reactVisualCheck } from '../../packages/cli/src/react-video';
 import { createRenderer, loadComposition, reviewComposition } from '@ove/core';
+
+it('rejects the wrong duration and checks copy in the rendered video rather than the source', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mr-react-brief-'));
+  try {
+    const source = join(dir, 'video.tsx'), output = join(dir, 'composition.json');
+    await writeFile(source, `export const config = { width:640,height:360,fps:30,durationInFrames:60 };
+export default function Video() {
+  return <div style={{background:'#fff',color:'#111',padding:30}}>
+    <div style={{fontSize:40}}>MAKE ROOM</div><div style={{fontSize:40}}>FOR SIGNAL</div>
+    <div style={{display:'none'}}>HIDDEN COPY</div>
+  </div>;
+}`);
+    await buildReact(source, output);
+    const wrongLength = await reactVisualCheck(dir, undefined, { seconds: 12, copy: [] })(source, output);
+    expect(wrongLength).toMatchObject({ passed: false, report: expect.stringContaining('Required 12s') });
+    const copy = await reactVisualCheck(dir, undefined, { seconds: 2, copy: ['MAKE ROOM FOR SIGNAL', 'HIDDEN COPY'] })(source, output);
+    expect(copy.passed).toBe(false);
+    expect(copy.report).toContain('required-copy: No sampled frame showed the exact visible phrase "HIDDEN COPY"');
+    expect(copy.report).not.toContain('required-copy: No sampled frame showed the exact visible phrase "MAKE ROOM FOR SIGNAL"');
+  } finally { await rm(dir, { recursive: true, force: true }); }
+}, 60_000);
 
 it('inspects visible and clipped React text even after a cached render', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'mr-react-review-'));
